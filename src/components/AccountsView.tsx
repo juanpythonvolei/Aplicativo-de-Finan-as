@@ -12,6 +12,7 @@ import {
 import { AccountInput, useFinance } from '../contexts/FinanceContext';
 import { formatCurrency } from '../lib/formatters';
 import { Account, AccountFormDraft, AccountType } from '../types/finance';
+import { DepthCard } from './DepthCard';
 
 interface AccountsViewProps {
   onPayCreditCard: (creditCard: Account, invoiceAmount: number) => void;
@@ -170,7 +171,7 @@ export function AccountsView({
   return (
     <div className="space-y-8">
       {/* Summary Header */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-wrap items-center justify-between gap-6">
+      <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-wrap items-center justify-between gap-6">
         <div className="flex flex-wrap items-center gap-8">
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -229,99 +230,103 @@ export function AccountsView({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {bankAccounts.map((acc) => {
+            {bankAccounts.map((acc, index) => {
               const isConfirming = confirmDeleteId === acc.id;
               return (
-                <div
+                <DepthCard
                   key={acc.id}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between gap-4"
+                  delay={Math.min(0.24, index * 0.04)}
+                  tiltStrength={3.5}
+                  className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
-                        style={{ backgroundColor: acc.color }}
-                      >
-                        {acc.type === 'wallet' ? (
-                          <Wallet className="w-5 h-5" />
-                        ) : (
-                          <Landmark className="w-5 h-5" />
-                        )}
+                  <div className="flex flex-col justify-between gap-4 h-full">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
+                          style={{ backgroundColor: acc.color }}
+                        >
+                          {acc.type === 'wallet' ? (
+                            <Wallet className="w-5 h-5" />
+                          ) : (
+                            <Landmark className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                            {acc.name}
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {ACCOUNT_TYPE_LABELS[acc.type]}
+                            {acc.institution ? ` · ${acc.institution}` : ''}
+                          </p>
+                        </div>
                       </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openEditModal(acc)}
+                          aria-label="Editar conta"
+                          className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(acc.id)}
+                          aria-label="Excluir conta"
+                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-end justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                          {acc.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {ACCOUNT_TYPE_LABELS[acc.type]}
-                          {acc.institution ? ` · ${acc.institution}` : ''}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Saldo atual</p>
+                        <p
+                          className={`font-mono text-lg font-semibold tabular-nums break-words ${
+                            acc.balance >= 0
+                              ? 'text-slate-900 dark:text-white'
+                              : 'text-red-600 dark:text-red-400'
+                          }`}
+                        >
+                          {formatCurrency(acc.balance, currency)}
                         </p>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => openEditModal(acc)}
-                        aria-label="Editar conta"
-                        className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(acc.id)}
-                        aria-label="Excluir conta"
-                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isConfirming ? (
+                        <div className="flex items-center gap-2 text-xs shrink-0">
+                          <button
+                            onClick={() => {
+                              deleteAccount(acc.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="text-red-600 font-semibold hover:underline"
+                          >
+                            Excluir
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-slate-500 hover:underline"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        accounts.length > 1 && (
+                          <button
+                            onClick={() => onQuickTransfer(acc)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 hover:underline whitespace-nowrap shrink-0"
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                            Transferir
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
-
-                  <div className="flex items-end justify-between gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Saldo atual</p>
-                      <p
-                        className={`font-mono text-lg font-semibold tabular-nums ${
-                          acc.balance >= 0
-                            ? 'text-slate-900 dark:text-white'
-                            : 'text-red-600 dark:text-red-400'
-                        }`}
-                      >
-                        {formatCurrency(acc.balance, currency)}
-                      </p>
-                    </div>
-
-                    {isConfirming ? (
-                      <div className="flex items-center gap-2 text-xs">
-                        <button
-                          onClick={() => {
-                            deleteAccount(acc.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          className="text-red-600 font-semibold hover:underline"
-                        >
-                          Excluir
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="text-slate-500 hover:underline"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      accounts.length > 1 && (
-                        <button
-                          onClick={() => onQuickTransfer(acc)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 hover:underline whitespace-nowrap"
-                        >
-                          <ArrowLeftRight className="w-3.5 h-3.5" />
-                          Transferir
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
+                </DepthCard>
               );
             })}
           </div>
@@ -348,7 +353,7 @@ export function AccountsView({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {creditCards.map((card) => {
+            {creditCards.map((card, index) => {
               const openInvoice = Math.max(0, -card.balance);
               const availableLimit = Math.max(0, card.creditLimit - openInvoice);
               const usagePct =
@@ -356,111 +361,115 @@ export function AccountsView({
               const isConfirming = confirmDeleteId === card.id;
 
               return (
-                <div
+                <DepthCard
                   key={card.id}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4"
+                  delay={Math.min(0.24, index * 0.05)}
+                  tiltStrength={3.5}
+                  className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
-                        style={{ backgroundColor: card.color }}
-                      >
-                        <CreditCard className="w-5 h-5" />
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
+                          style={{ backgroundColor: card.color }}
+                        >
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                            {card.name}
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {card.institution || 'Cartão de Crédito'} · Fecha dia {card.closingDay} ·
+                            Vence dia {card.dueDay}
+                          </p>
+                        </div>
                       </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openEditModal(card)}
+                          aria-label="Editar cartão"
+                          className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(card.id)}
+                          aria-label="Excluir cartão"
+                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="text-slate-500 dark:text-slate-400">
+                          Utilização do limite ({usagePct.toFixed(0)}%)
+                        </span>
+                        <span className="font-mono tabular-nums text-slate-600 dark:text-slate-300">
+                          Disponível: {formatCurrency(availableLimit, currency)}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            usagePct >= 85
+                              ? 'bg-red-600'
+                              : usagePct >= 60
+                              ? 'bg-amber-500'
+                              : 'bg-teal-600'
+                          }`}
+                          style={{ width: `${usagePct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                          {card.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {card.institution || 'Cartão de Crédito'} · Fecha dia {card.closingDay} ·
-                          Vence dia {card.dueDay}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Fatura em aberto
+                        </p>
+                        <p className="font-mono text-lg font-semibold tabular-nums break-words text-slate-900 dark:text-white">
+                          {formatCurrency(openInvoice, currency)}
                         </p>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => openEditModal(card)}
-                        aria-label="Editar cartão"
-                        className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(card.id)}
-                        aria-label="Excluir cartão"
-                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isConfirming ? (
+                        <div className="flex items-center gap-2 text-xs shrink-0">
+                          <button
+                            onClick={() => {
+                              deleteAccount(card.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="text-red-600 font-semibold hover:underline"
+                          >
+                            Confirmar Exclusão
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-slate-500 hover:underline"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        openInvoice > 0 &&
+                        bankAccounts.length > 0 && (
+                          <button
+                            onClick={() => onPayCreditCard(card, openInvoice)}
+                            className="px-3.5 py-2 text-xs font-medium bg-teal-700 hover:bg-teal-800 text-white rounded-lg transition-colors whitespace-nowrap shrink-0"
+                          >
+                            Pagar Fatura
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">
-                        Utilização do limite ({usagePct.toFixed(0)}%)
-                      </span>
-                      <span className="font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                        Disponível: {formatCurrency(availableLimit, currency)}
-                      </span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          usagePct >= 85
-                            ? 'bg-red-600'
-                            : usagePct >= 60
-                            ? 'bg-amber-500'
-                            : 'bg-teal-600'
-                        }`}
-                        style={{ width: `${usagePct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Fatura em aberto
-                      </p>
-                      <p className="font-mono text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
-                        {formatCurrency(openInvoice, currency)}
-                      </p>
-                    </div>
-
-                    {isConfirming ? (
-                      <div className="flex items-center gap-2 text-xs">
-                        <button
-                          onClick={() => {
-                            deleteAccount(card.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          className="text-red-600 font-semibold hover:underline"
-                        >
-                          Confirmar Exclusão
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="text-slate-500 hover:underline"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      openInvoice > 0 &&
-                      bankAccounts.length > 0 && (
-                        <button
-                          onClick={() => onPayCreditCard(card, openInvoice)}
-                          className="px-3.5 py-2 text-xs font-medium bg-teal-700 hover:bg-teal-800 text-white rounded-lg transition-colors whitespace-nowrap"
-                        >
-                          Pagar Fatura
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
+                </DepthCard>
               );
             })}
           </div>

@@ -40,14 +40,14 @@ export function MobileBottomNav({
             key={item.id}
             type="button"
             onClick={() => onSelectTab(item.id)}
-            className={`flex flex-col items-center justify-center gap-1 min-h-[44px] text-[11px] font-medium transition-colors whitespace-nowrap ${
+            className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] text-xs font-medium transition-all active:scale-95 whitespace-nowrap ${
               active
                 ? 'text-teal-700 dark:text-teal-400'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Icon className="w-4 h-4 shrink-0" />
-            <span className="truncate max-w-full px-1">{item.label}</span>
+            <span className="max-w-full px-0.5">{item.label}</span>
           </button>
         );
       })}
@@ -55,14 +55,14 @@ export function MobileBottomNav({
       <button
         type="button"
         onClick={onOpenMoreMenu}
-        className={`flex flex-col items-center justify-center gap-1 min-h-[44px] text-[11px] font-medium transition-colors whitespace-nowrap ${
+        className={`flex flex-col items-center justify-center gap-0.5 min-h-[44px] text-xs font-medium transition-all active:scale-95 whitespace-nowrap ${
           isSecondaryActive
             ? 'text-teal-700 dark:text-teal-400'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
         }`}
       >
         <Menu className="w-4 h-4 shrink-0" />
-        <span className="truncate max-w-full px-1">Menu</span>
+        <span className="max-w-full px-0.5">Menu</span>
       </button>
     </nav>
   );

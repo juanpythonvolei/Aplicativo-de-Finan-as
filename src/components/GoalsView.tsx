@@ -3,6 +3,7 @@ import { CheckCircle2, Edit2, Plus, Target, Trash2, X } from 'lucide-react';
 import { useFinance } from '../contexts/FinanceContext';
 import { formatCurrency, formatIsoDate, getTodayIso } from '../lib/formatters';
 import { Goal, GoalFormDraft } from '../types/finance';
+import { DepthCard } from './DepthCard';
 
 const GOAL_COLORS = ['#0F766E', '#0284C7', '#D97706', '#7C3AED', '#DC2626'];
 
@@ -163,7 +164,7 @@ export function GoalsView({ externalDraft }: GoalsViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-wrap items-center justify-between gap-6">
+      <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-wrap items-center justify-between gap-6">
         <div className="flex flex-wrap items-center gap-8">
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -207,98 +208,102 @@ export function GoalsView({ externalDraft }: GoalsViewProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {goals.map((g) => {
+          {goals.map((g, index) => {
             const pct = Math.min(100, (g.currentAmount / g.targetAmount) * 100);
             const remaining = Math.max(0, g.targetAmount - g.currentAmount);
             const isCompleted = g.status === 'completed';
 
             return (
-              <div
+              <DepthCard
                 key={g.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between gap-4"
+                delay={Math.min(0.24, index * 0.04)}
+                tiltStrength={3.5}
+                className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
-                        style={{ backgroundColor: g.color }}
-                      >
-                        <Target className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                          {g.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Prazo: {formatIsoDate(g.deadline)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {!isCompleted && (
-                        <button
-                          onClick={() => openEdit(g)}
-                          aria-label="Editar meta"
-                          className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                <div className="flex flex-col justify-between gap-4 h-full">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
+                          style={{ backgroundColor: g.color }}
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Target className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                            {g.name}
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Prazo: {formatIsoDate(g.deadline)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!isCompleted && (
+                          <button
+                            onClick={() => openEdit(g)}
+                            aria-label="Editar meta"
+                            className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteGoal(g.id)}
+                          aria-label="Excluir meta"
+                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      <button
-                        onClick={() => deleteGoal(g.id)}
-                        aria-label="Excluir meta"
-                        className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-mono tabular-nums">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {formatCurrency(g.currentAmount, currency)}
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {pct.toFixed(1)}% de {formatCurrency(g.targetAmount, currency)}
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${pct}%`, backgroundColor: g.color }}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-mono tabular-nums">
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {formatCurrency(g.currentAmount, currency)}
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    {isCompleted ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Meta concluída
                       </span>
-                      <span className="text-slate-500 dark:text-slate-400">
-                        {pct.toFixed(1)}% de {formatCurrency(g.targetAmount, currency)}
-                      </span>
-                    </div>
-                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${pct}%`, backgroundColor: g.color }}
-                      />
-                    </div>
+                    ) : (
+                      <>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
+                          Faltam {formatCurrency(remaining, currency)}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setContribGoal(g);
+                            setContribAmount('');
+                            setSourceAccountId('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium bg-teal-700 hover:bg-teal-800 text-white rounded-lg transition-colors whitespace-nowrap shrink-0"
+                        >
+                          Aportar
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-                  {isCompleted ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Meta concluída
-                    </span>
-                  ) : (
-                    <>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        Faltam {formatCurrency(remaining, currency)}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setContribGoal(g);
-                          setContribAmount('');
-                          setSourceAccountId('');
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium bg-teal-700 hover:bg-teal-800 text-white rounded-lg transition-colors whitespace-nowrap"
-                      >
-                        Aportar
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+              </DepthCard>
             );
           })}
         </div>

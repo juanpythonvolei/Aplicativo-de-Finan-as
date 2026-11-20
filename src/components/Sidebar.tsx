@@ -82,9 +82,9 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => handleSelect('assistant')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
               activeTab === 'assistant'
-                ? 'bg-teal-700 text-white'
+                ? 'bg-teal-700 text-white shadow-sm'
                 : 'bg-teal-50/80 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-teal-100/80 dark:hover:bg-teal-950/80'
             }`}
           >
@@ -95,7 +95,7 @@ export function Sidebar({
 
         {/* Secondary System Modules */}
         <div className="space-y-1">
-          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Módulos do Sistema
           </p>
           {SECONDARY_MODULES.map((item) => {
@@ -121,7 +121,7 @@ export function Sidebar({
 
         {/* Distributions / Downloads */}
         <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-1">
-          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Distribuições
           </p>
           <button
@@ -165,11 +165,11 @@ export function Sidebar({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                 {displayName}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                Configurações · {currency} · {theme === 'dark' ? 'Escuro' : 'Claro'}
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {currency} · {theme === 'dark' ? 'Escuro' : 'Claro'} · Ajustes
               </p>
             </div>
             <Settings2 className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 shrink-0" />

@@ -1,12 +1,17 @@
 package com.verticefinance.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.*
@@ -18,8 +23,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.verticefinance.app.data.AIConversationDoc
+import com.verticefinance.app.data.ApiUsageSummary
 import com.verticefinance.app.data.Formatters
+import java.util.Locale
 
 private val ANDROID_QUICK_PROMPTS = listOf(
     "Faça um resumo completo do meu mês atual",
@@ -61,49 +69,54 @@ fun AssistantScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Compact Financial Summary Strip
+        // Elevated Financial Summary Strip (non-clipping responsive layout)
         Surface(
             color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 3.dp,
+            tonalElevation = 1.dp,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Saldo Consolidado",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = Formatters.currency(consolidated, state.currency),
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "+${Formatters.currency(monthIncome, state.currency)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = EmeraldPositive
+                        color = EmeraldPositive,
+                        maxLines = 1
                     )
                     Text(
                         text = "-${Formatters.currency(monthExpense, state.currency)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = CrimsonNegative
+                        color = CrimsonNegative,
+                        maxLines = 1
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = onOpenDashboard) {
                     Icon(Icons.Outlined.BarChart, contentDescription = "Ver resumo financeiro")
                 }
@@ -114,7 +127,7 @@ fun AssistantScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -123,7 +136,7 @@ fun AssistantScreen(
                     .weight(1f)
                     .clickable { showHistorySheet = true },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(
                     Icons.Outlined.History,
@@ -138,15 +151,20 @@ fun AssistantScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    val routingSubtitle = state.lastRouting?.let { r ->
+                        "${r.selectedModel} · ${r.complexityLabel}"
+                    } ?: "${state.aiConversations.size} conversa(s) salva(s)"
                     Text(
-                        text = "${state.aiConversations.size} conversa(s) salva(s)",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = routingSubtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
             TextButton(onClick = onNewConversation) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Nova")
             }
@@ -161,13 +179,15 @@ fun AssistantScreen(
                 .weight(1f)
                 .fillMaxWidth(),
             contentPadding = PaddingValues(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (state.activeMessages.isEmpty()) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp,
+                        tonalElevation = 1.dp,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -179,8 +199,9 @@ fun AssistantScreen(
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "Diga o que deseja analisar ou executar: lançar receitas e despesas, criar contas, ajustar orçamentos, aportar em metas ou alterar configurações.",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "Roteamento inteligente ativo: escolhe automaticamente o modelo mais adequado à complexidade do seu pedido para lançar receitas e despesas, criar contas, ajustar orçamentos ou analisar seu patrimônio.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -188,8 +209,9 @@ fun AssistantScreen(
                 }
                 items(ANDROID_QUICK_PROMPTS) { prompt ->
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 2.dp,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -197,8 +219,9 @@ fun AssistantScreen(
                     ) {
                         Text(
                             text = prompt,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(14.dp)
                         )
                     }
@@ -236,7 +259,7 @@ fun AssistantScreen(
                                             )
                                             Text(
                                                 text = act,
-                                                style = MaterialTheme.typography.labelSmall
+                                                style = MaterialTheme.typography.bodySmall
                                             )
                                         }
                                     }
@@ -248,21 +271,23 @@ fun AssistantScreen(
                             shape = RoundedCornerShape(14.dp),
                             color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            shadowElevation = if (isUser) 3.dp else 2.dp,
                             border = if (isUser) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier.widthIn(max = 320.dp)
+                            modifier = Modifier.widthIn(max = 330.dp)
                         ) {
                             Text(
                                 text = msg.text,
                                 style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                lineHeight = 21.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp)
                             )
                         }
                     }
                 }
             }
 
-            if (state.aiSending) {
-                item {
+            item {
+                AnimatedVisibility(visible = state.aiSending, enter = fadeIn(), exit = fadeOut()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -270,8 +295,8 @@ fun AssistantScreen(
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Text(
-                            text = "Processando no Vértice IA...",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Avaliando complexidade e processando...",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -282,6 +307,7 @@ fun AssistantScreen(
         // Composer
         Surface(
             color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -361,7 +387,7 @@ fun AssistantScreen(
                 if (filtered.isEmpty()) {
                     Text(
                         text = "Nenhuma conversa encontrada.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 16.dp)
                     )
@@ -392,7 +418,7 @@ fun AssistantScreen(
                                             text = conv.title,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
+                                            maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         if (conv.preview.isNotBlank()) {
@@ -400,7 +426,7 @@ fun AssistantScreen(
                                                 text = conv.preview,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
+                                                maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
@@ -422,11 +448,15 @@ fun AssistantScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsDialog(
     currency: String,
     theme: String,
     userEmail: String,
+    apiUsage: ApiUsageSummary?,
+    apiUsageLoading: Boolean,
+    onRefreshApiUsage: () -> Unit,
     onSelectCurrency: (String) -> Unit,
     onSelectTheme: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -440,18 +470,25 @@ fun SettingsDialog(
                 if (userEmail.isNotBlank()) {
                     Text(
                         text = userEmail,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Moeda Principal",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -468,7 +505,7 @@ fun SettingsDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Tema da Interface",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -481,6 +518,88 @@ fun SettingsDialog(
                             selected = theme == "dark",
                             onClick = { onSelectTheme("dark") },
                             label = { Text("Escuro") }
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+                // Per-Model API Usage Section
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Uso de API por Modelo",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        TextButton(
+                            onClick = onRefreshApiUsage,
+                            enabled = !apiUsageLoading,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(if (apiUsageLoading) "Atualizando..." else "Atualizar")
+                        }
+                    }
+
+                    if (apiUsageLoading && apiUsage == null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text(
+                                text = "Consultando consumo real...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else if (apiUsage != null) {
+                        Text(
+                            text = "${apiUsage.totalRequests} req · ${apiUsage.totalTokens} tokens · US$ ${String.format(Locale.US, "%.4f", apiUsage.estimatedCostUsd)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        apiUsage.models.forEach { m ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = m.label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "${m.requests} chamadas · ${m.totalTokens} tokens · ${m.avgLatencyMs}ms",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "Entrada ${m.inputTokens} · Saída ${m.outputTokens} · US$ ${String.format(Locale.US, "%.4f", m.estimatedCostUsd)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Toque em Atualizar para consultar o consumo por modelo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

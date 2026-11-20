@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
+  Activity,
   CheckCircle2,
   Cpu,
   Database,
@@ -13,6 +15,7 @@ import {
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Sun,
   User as UserIcon,
   X,
@@ -21,8 +24,13 @@ import { useFinance } from '../contexts/FinanceContext';
 import { auth } from '../firebase';
 import { evaluatePasswordStrength, mapFirebaseAuthError } from '../lib/authErrors';
 import { CurrencyCode, SettingsSection } from '../types/finance';
-import { AIProfileId, AI_PROFILE_LIST } from '../../shared/aiProfiles';
+import {
+  AIProfileId,
+  AIUsageSummaryResponse,
+  AI_PROFILE_LIST,
+} from '../../shared/aiProfiles';
 import type { DatabaseStatsResponse } from '../../shared/databaseStats';
+import { DepthCard } from './DepthCard';
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -89,6 +97,11 @@ export function AccountSecurityModal({
   const [dbLoading, setDbLoading] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
+  const [usageData, setUsageData] = useState<AIUsageSummaryResponse | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageScope, setUsageScope] = useState<'user' | 'global'>('user');
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -100,7 +113,7 @@ export function AccountSecurityModal({
     null
   );
 
-  const loadDatabaseStats = async () => {
+  const loadDatabaseStats = useCallback(async () => {
     if (!isAdmin || !auth.currentUser) return;
     setDbLoading(true);
     setDbError(null);
@@ -121,7 +134,39 @@ export function AccountSecurityModal({
     } finally {
       setDbLoading(false);
     }
-  };
+  }, [isAdmin]);
+
+  const loadApiUsage = useCallback(
+    async (scopeOverride?: 'user' | 'global') => {
+      if (!auth.currentUser) return;
+      const targetScope = scopeOverride ?? usageScope;
+      const effectiveScope = isAdmin && targetScope === 'global' ? 'global' : 'user';
+      setUsageLoading(true);
+      setUsageError(null);
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const url =
+          effectiveScope === 'global'
+            ? '/api/assistant/usage?scope=global'
+            : '/api/assistant/usage';
+        const resp = await fetch(url, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data?.error || 'Não foi possível consultar o uso de API.');
+        }
+        setUsageData(data as AIUsageSummaryResponse);
+      } catch (err) {
+        setUsageError(
+          err instanceof Error ? err.message : 'Erro ao carregar o uso de API dos modelos.'
+        );
+      } finally {
+        setUsageLoading(false);
+      }
+    },
+    [isAdmin, usageScope]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -141,9 +186,15 @@ export function AccountSecurityModal({
     if (open && isAdmin && activeTab === 'database' && !dbStats && !dbLoading) {
       loadDatabaseStats();
     }
-  }, [open, isAdmin, activeTab]);
+  }, [open, isAdmin, activeTab, dbStats, dbLoading, loadDatabaseStats]);
 
-  if (!open || !user) return null;
+  useEffect(() => {
+    if (open && activeTab === 'usage') {
+      loadApiUsage(usageScope);
+    }
+  }, [open, activeTab, usageScope, loadApiUsage]);
+
+  if (!user) return null;
 
   const providerIds = user.providerData.map((p) => p.providerId);
   const hasPasswordProvider = providerIds.includes('password');
@@ -242,122 +293,148 @@ export function AccountSecurityModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Configurações e Conta"
-        className={`w-full ${
-          isAdmin && (activeTab === 'database' || activeTab === 'ai') ? 'max-w-2xl' : 'max-w-lg'
-        } bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[92vh] flex flex-col transition-all`}
-      >
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
-              Configurações e Conta
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {user.email}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar janela"
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  const isWideTab =
+    activeTab === 'usage' || (isAdmin && (activeTab === 'database' || activeTab === 'ai'));
 
-        <div className="px-6 pt-4">
-          <div
-            className={`grid gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg ${
-              isAdmin ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-3'
-            }`}
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-[2px]"
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Configurações e Conta"
+            initial={{ opacity: 0, y: 14, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className={`w-full ${
+              isWideTab ? 'max-w-3xl' : 'max-w-lg'
+            } depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[92vh] flex flex-col transition-all`}
           >
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('preferences');
-                setFeedback(null);
-              }}
-              className={`py-2 px-2.5 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                activeTab === 'preferences'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-              <span>Preferências</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('profile');
-                setFeedback(null);
-              }}
-              className={`py-2 px-2.5 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                activeTab === 'profile'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <UserIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Perfil</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('security');
-                setFeedback(null);
-              }}
-              className={`py-2 px-2.5 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                activeTab === 'security'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-              <span>Segurança</span>
-            </button>
-            {isAdmin && (
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                  Configurações e Conta
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {user.email}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setActiveTab('ai');
-                  setFeedback(null);
-                }}
-                className={`py-2 px-2.5 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                  activeTab === 'ai'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                onClick={onClose}
+                aria-label="Fechar janela"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
               >
-                <Cpu className="w-3.5 h-3.5 shrink-0" />
-                <span>IA (Admin)</span>
+                <X className="w-5 h-5" />
               </button>
-            )}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('database');
-                  setFeedback(null);
-                }}
-                className={`py-2 px-2.5 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                  activeTab === 'database'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Database className="w-3.5 h-3.5 shrink-0" />
-                <span>Banco (Admin)</span>
-              </button>
-            )}
-          </div>
-        </div>
+            </div>
+
+            <div className="px-6 pt-4">
+              <div className="flex items-center gap-1 overflow-x-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('preferences');
+                    setFeedback(null);
+                  }}
+                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeTab === 'preferences'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
+                  <span>Preferências</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('profile');
+                    setFeedback(null);
+                  }}
+                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeTab === 'profile'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <UserIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Perfil</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('security');
+                    setFeedback(null);
+                  }}
+                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeTab === 'security'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Segurança</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('usage');
+                    setFeedback(null);
+                  }}
+                  className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeTab === 'usage'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5 shrink-0" />
+                  <span>Uso de API</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('ai');
+                      setFeedback(null);
+                    }}
+                    className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeTab === 'ai'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Cpu className="w-3.5 h-3.5 shrink-0" />
+                    <span>IA (Admin)</span>
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('database');
+                      setFeedback(null);
+                    }}
+                    className={`py-2 px-3 text-xs font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeTab === 'database'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Database className="w-3.5 h-3.5 shrink-0" />
+                    <span>Banco (Admin)</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
         <div className="p-6 space-y-5 overflow-y-auto">
           {feedback && (
@@ -438,9 +515,9 @@ export function AccountSecurityModal({
                     }`}
                   >
                     <Sun className="w-4 h-4 text-amber-600 shrink-0" />
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">Claro</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Alto contraste diurno
                       </p>
                     </div>
@@ -458,9 +535,9 @@ export function AccountSecurityModal({
                     }`}
                   >
                     <Moon className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">Escuro</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Conforto visual noturno
                       </p>
                     </div>
@@ -715,16 +792,279 @@ export function AccountSecurityModal({
             </div>
           )}
 
+          {activeTab === 'usage' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Uso de API por Modelo Acessível
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {usageData
+                      ? `Medido em ${formatDateTimePt(usageData.measuredAt)} · Consumo real retornado pela API Gemini`
+                      : 'Telemetria real de requisições, tokens e custo estimado de cada modelo'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isAdmin && (
+                    <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setUsageScope('user')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                          usageScope === 'user'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Meu consumo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUsageScope('global')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                          usageScope === 'global'
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Global (todos)
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => loadApiUsage(usageScope)}
+                    disabled={usageLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${usageLoading ? 'animate-spin' : ''}`} />
+                    <span>{usageLoading ? 'Atualizando...' : 'Atualizar'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {usageError && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/50 px-4 py-3 text-xs text-red-800 dark:text-red-200 flex items-center justify-between gap-3"
+                >
+                  <span>{usageError}</span>
+                  <button
+                    type="button"
+                    onClick={() => loadApiUsage(usageScope)}
+                    className="font-semibold underline whitespace-nowrap"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+
+              {usageLoading && !usageData && (
+                <div className="space-y-3" aria-busy="true">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="h-20 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/40 animate-pulse"
+                      />
+                    ))}
+                  </div>
+                  <div className="h-40 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/40 animate-pulse" />
+                </div>
+              )}
+
+              {usageData && (
+                <>
+                  {/* Totals Strip */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <DepthCard
+                      delay={0}
+                      tiltStrength={2.5}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5"
+                    >
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Requisições</p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
+                        {usageData.totals.requests.toLocaleString('pt-BR')}
+                      </p>
+                    </DepthCard>
+
+                    <DepthCard
+                      delay={0.04}
+                      tiltStrength={2.5}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5"
+                    >
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Tokens Totais</p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
+                        {usageData.totals.totalTokens.toLocaleString('pt-BR')}
+                      </p>
+                    </DepthCard>
+
+                    <DepthCard
+                      delay={0.08}
+                      tiltStrength={2.5}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5"
+                    >
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Latência Média</p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
+                        {usageData.totals.avgLatencyMs > 0
+                          ? `${usageData.totals.avgLatencyMs.toLocaleString('pt-BR')} ms`
+                          : '—'}
+                      </p>
+                    </DepthCard>
+
+                    <DepthCard
+                      delay={0.12}
+                      tiltStrength={2.5}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5"
+                    >
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Custo Estimado</p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-teal-700 dark:text-teal-400">
+                        US${' '}
+                        {usageData.totals.estimatedCostUsd.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
+                        })}
+                      </p>
+                    </DepthCard>
+                  </div>
+
+                  {/* Per-Model Cards */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                      Detalhamento por Modelo Acessível ({usageData.models.length})
+                    </p>
+
+                    {usageData.models.map((m, idx) => (
+                      <DepthCard
+                        key={m.modelId}
+                        delay={0.05 * idx}
+                        tiltStrength={2.5}
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/50 p-4"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                                  {m.label}
+                                </h4>
+                                <span className="font-mono text-xs text-teal-700 dark:text-teal-400">
+                                  {m.modelId}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                                {m.family} · {m.roleSummary}
+                              </p>
+                            </div>
+                            <div className="text-right font-mono tabular-nums shrink-0">
+                              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {m.requests.toLocaleString('pt-BR')} chamadas
+                              </p>
+                              <p className="text-xs text-teal-700 dark:text-teal-400">
+                                {m.sharePercent.toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 1,
+                                  maximumFractionDigits: 1,
+                                })}
+                                % do tráfego
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-teal-600 dark:bg-teal-500 rounded-full transition-all"
+                              style={{
+                                width: `${
+                                  m.requests > 0 ? Math.max(4, Math.min(100, m.sharePercent)) : 0
+                                }%`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-xs font-mono tabular-nums">
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400 block font-sans">
+                                Entrada
+                              </span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {m.inputTokens.toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400 block font-sans">
+                                Saída
+                              </span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {m.outputTokens.toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400 block font-sans">
+                                Raciocínio
+                              </span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {m.thinkingTokens.toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 dark:text-slate-400 block font-sans">
+                                Latência · Custo
+                              </span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {m.avgLatencyMs > 0 ? `${m.avgLatencyMs} ms` : '—'} · US${' '}
+                                {m.estimatedCostUsd.toLocaleString('pt-BR', {
+                                  minimumFractionDigits: 4,
+                                  maximumFractionDigits: 4,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="font-mono tabular-nums">
+                              Complexidade: Simples {m.complexityBreakdown.simple} · Moderada{' '}
+                              {m.complexityBreakdown.moderate} · Complexa{' '}
+                              {m.complexityBreakdown.complex} · Crítica{' '}
+                              {m.complexityBreakdown.critical}
+                            </span>
+                            <span>Último uso: {formatDateTimePt(m.lastUsedAt)}</span>
+                          </div>
+                        </div>
+                      </DepthCard>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between gap-3 flex-wrap border-t border-slate-200 dark:border-slate-800">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Cada chamada ao Assistente IA (Web, Linux, Windows ou Android) registra tokens
+                      reais e complexidade automaticamente.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {isAdmin && activeTab === 'ai' && (
             <form onSubmit={handleSaveAIConfig} className="space-y-4">
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-4 py-3 space-y-1">
                 <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                  Motor e Economia do Assistente IA
+                  Motor, Complexidade Dinâmica e Seleção de Modelos IA
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Controle exclusivo do administrador. Define globalmente o modelo Gemini e o nível
-                  de raciocínio utilizados pelo assistente para equilibrar custo de tokens e
-                  precisão operacional.
+                  Controle exclusivo do administrador. Escolha o Roteamento Inteligente Dinâmico
+                  para que o servidor classifique a complexidade de cada ação automaticamente ou
+                  fixe manualmente um dos perfis abaixo.
                 </p>
               </div>
 
@@ -754,11 +1094,11 @@ export function AccountSecurityModal({
                             <span className="text-sm font-semibold text-slate-900 dark:text-white">
                               {item.label}
                             </span>
-                            <span className="text-[11px] font-medium text-teal-700 dark:text-teal-400">
+                            <span className="text-xs font-medium text-teal-700 dark:text-teal-400">
                               {item.tag}
                             </span>
                           </div>
-                          <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
                             {item.modelId} · Thinking {item.thinkingLevel} · {item.costSummary}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -770,6 +1110,61 @@ export function AccountSecurityModal({
                   );
                 })}
               </div>
+
+              {selectedProfile === 'auto_dynamic' && (
+                <div className="rounded-xl border border-teal-700/25 dark:border-teal-500/30 bg-teal-50/40 dark:bg-teal-950/20 p-4 space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-teal-800 dark:text-teal-300">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>Matriz Autônoma de Complexidade de Ação (Ativa)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 p-2.5">
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        Simples (0–24 pts)
+                      </p>
+                      <p className="font-mono text-teal-700 dark:text-teal-400">
+                        gemini-3.1-flash-lite · MINIMAL
+                      </p>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Perguntas diretas, saldo rápido, troca de tema, moeda ou navegação.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 p-2.5">
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        Moderada (25–54 pts)
+                      </p>
+                      <p className="font-mono text-teal-700 dark:text-teal-400">
+                        gemini-4-hydrogen · LOW
+                      </p>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Registro de despesas/receitas, criação de metas, orçamentos e edição de contas.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 p-2.5">
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        Complexa (55–79 pts)
+                      </p>
+                      <p className="font-mono text-teal-700 dark:text-teal-400">
+                        gemini-4-hydrogen · MEDIUM
+                      </p>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Leitura OCR de comprovantes/fotos, parcelamentos e análises comparativas.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 p-2.5">
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        Crítica (80–100 pts)
+                      </p>
+                      <p className="font-mono text-teal-700 dark:text-teal-400">
+                        gemini-4-hydrogen · HIGH
+                      </p>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Auditorias patrimoniais profundas, múltiplos anexos e ações em lote.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex items-center justify-end gap-3">
                 <button
@@ -866,7 +1261,7 @@ export function AccountSecurityModal({
                           })}
                           % disponível
                         </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Uso est. c/ índices: {formatBytes(dbStats.storage.estimatedWithIndexesBytes)} / 1,000 GB
                         </p>
                       </div>
@@ -908,7 +1303,7 @@ export function AccountSecurityModal({
                   {/* Key Totals Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-3.5 py-2.5">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Total de Documentos
                       </p>
                       <p className="font-mono text-lg font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
@@ -916,7 +1311,7 @@ export function AccountSecurityModal({
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-3.5 py-2.5">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Usuários / Contas
                       </p>
                       <p className="font-mono text-lg font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
@@ -925,7 +1320,7 @@ export function AccountSecurityModal({
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-3.5 py-2.5">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Lançamentos
                       </p>
                       <p className="font-mono text-lg font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
@@ -933,7 +1328,7 @@ export function AccountSecurityModal({
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-3.5 py-2.5">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Última Gravação
                       </p>
                       <p className="font-mono text-xs font-semibold text-slate-900 dark:text-white tabular-nums mt-1.5 truncate">
@@ -1012,7 +1407,7 @@ export function AccountSecurityModal({
                                   <p className="font-medium text-slate-900 dark:text-white truncate">
                                     {u.displayName}
                                   </p>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                                     {u.email || u.userId}
                                   </p>
                                 </td>
@@ -1068,7 +1463,7 @@ export function AccountSecurityModal({
                       <span className="font-mono tabular-nums">{dbStats.diagnosticReadCalls}</span>{' '}
                       chamadas de listagem.
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       O tamanho de documentos reflete a fórmula oficial do Firestore (caminho + campos +
                       32 bytes/doc), somado a uma estimativa conservadora de índices (+45%). Para
                       acompanhar faturamento e métricas exatas do console Google Cloud, acesse o
@@ -1097,8 +1492,10 @@ export function AccountSecurityModal({
               )}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

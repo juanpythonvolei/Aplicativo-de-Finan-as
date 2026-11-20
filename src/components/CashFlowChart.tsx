@@ -39,9 +39,9 @@ export function CashFlowChart() {
     return peak * 1.15;
   }, [monthsData]);
 
-  const chartHeight = 220;
+  const chartHeight = 224;
   const chartWidth = 600;
-  const padLeft = 56;
+  const padLeft = 64;
   const padRight = 16;
   const padTop = 16;
   const padBottom = 32;
@@ -54,7 +54,7 @@ export function CashFlowChart() {
   const hovered = hoveredIdx !== null ? monthsData[hoveredIdx] : null;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col justify-between">
+    <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col justify-between">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div>
           <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -102,7 +102,7 @@ export function CashFlowChart() {
                   x={padLeft - 8}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-slate-400 dark:fill-slate-500 text-[10px] font-mono tabular-nums"
+                  className="fill-slate-400 dark:fill-slate-500 text-xs font-mono tabular-nums"
                 >
                   {formatCompactCurrency(val, currency)}
                 </text>
@@ -160,7 +160,7 @@ export function CashFlowChart() {
                   x={centerX}
                   y={chartHeight - 8}
                   textAnchor="middle"
-                  className={`text-[11px] font-mono ${
+                  className={`text-xs font-mono ${
                     isSelected
                       ? 'fill-teal-700 dark:fill-teal-400 font-semibold'
                       : 'fill-slate-500 dark:fill-slate-400'

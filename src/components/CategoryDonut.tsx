@@ -38,7 +38,7 @@ export function CategoryDonut() {
   let cumulativeOffset = 0;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col">
+    <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col">
       <div>
         <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
           Despesas por Categoria
@@ -87,7 +87,7 @@ export function CategoryDonut() {
               })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">Total</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Total</span>
               <span className="text-xs font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
                 {formatCurrency(totalExpense, currency)}
               </span>

@@ -21,7 +21,7 @@ export type ViewTab =
   | 'categories'
   | 'downloads';
 
-export type SettingsSection = 'preferences' | 'profile' | 'security' | 'ai' | 'database';
+export type SettingsSection = 'preferences' | 'profile' | 'security' | 'usage' | 'ai' | 'database';
 
 export interface UserWorkspace {
   userId: string;

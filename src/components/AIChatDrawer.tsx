@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
   Bot,
@@ -35,20 +36,28 @@ export function AIChatDrawer({ open, onClose, ...callbacks }: AIChatDrawerProps)
     }
   }, [chat.messages.length, chat.sending, open]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-[1px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+            onClick={onClose}
+            aria-hidden="true"
+          />
 
-      <section
-        aria-label="Chat rápido com Assistente Financeiro IA"
-        className="relative z-10 w-full sm:max-w-[460px] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-xl"
-      >
+          <motion.section
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+            aria-label="Chat rápido com Assistente Financeiro IA"
+            className="relative z-10 w-full sm:max-w-[460px] h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shadow-2xl"
+          >
         <header className="h-16 px-4 sm:px-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0">
@@ -165,6 +174,13 @@ export function AIChatDrawer({ open, onClose, ...callbacks }: AIChatDrawerProps)
                     <div className="rounded-2xl rounded-tl-sm border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 px-4 py-3">
                       <FormattedAssistantText text={msg.text} />
                     </div>
+
+                    {msg.routing && (
+                      <p className="text-xs font-mono text-slate-500 dark:text-slate-400 px-1 tabular-nums">
+                        {msg.routing.selectedModel} ({msg.routing.selectedThinkingLevel}) ·{' '}
+                        {msg.routing.complexityLabel}
+                      </p>
+                    )}
 
                     {msg.confirmations && msg.confirmations.length > 0 && (
                       <div className="space-y-2">
@@ -302,7 +318,9 @@ export function AIChatDrawer({ open, onClose, ...callbacks }: AIChatDrawerProps)
             </button>
           </div>
         </div>
-      </section>
-    </div>
+          </motion.section>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

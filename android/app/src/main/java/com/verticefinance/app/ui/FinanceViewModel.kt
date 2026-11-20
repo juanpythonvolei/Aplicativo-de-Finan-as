@@ -14,8 +14,10 @@ import com.verticefinance.app.R
 import com.verticefinance.app.data.AIConversationDoc
 import com.verticefinance.app.data.AIMessageDoc
 import com.verticefinance.app.data.AccountDoc
+import com.verticefinance.app.data.ApiUsageSummary
 import com.verticefinance.app.data.AssistantApiCall
 import com.verticefinance.app.data.AssistantClient
+import com.verticefinance.app.data.AssistantRoutingInfo
 import com.verticefinance.app.data.BudgetDoc
 import com.verticefinance.app.data.CategoryDoc
 import com.verticefinance.app.data.FinanceRepository
@@ -47,6 +49,9 @@ data class FinanceUiState(
     val activeConversationId: String? = null,
     val activeMessages: List<AIMessageDoc> = emptyList(),
     val aiSending: Boolean = false,
+    val lastRouting: AssistantRoutingInfo? = null,
+    val apiUsage: ApiUsageSummary? = null,
+    val apiUsageLoading: Boolean = false,
     val requestedTab: Int? = null,
     val message: String? = null
 )
@@ -225,6 +230,25 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun consumeRequestedTab() {
         _uiState.update { it.copy(requestedTab = null) }
+    }
+
+    fun refreshApiUsage() {
+        val user = _uiState.value.user ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(apiUsageLoading = true) }
+            try {
+                val idToken = user.getIdToken(false).await().token ?: ""
+                val summary = assistantClient.fetchApiUsage(idToken)
+                _uiState.update { it.copy(apiUsage = summary, apiUsageLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        apiUsageLoading = false,
+                        message = e.localizedMessage ?: "Não foi possível carregar o uso da API."
+                    )
+                }
+            }
+        }
     }
 
     private fun buildCompactSnapshot(state: FinanceUiState): String {
@@ -485,6 +509,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     val snapshot = buildCompactSnapshot(_uiState.value)
                     val res = assistantClient.chat(idToken, contents, snapshot)
                     profileId = res.profileId
+                    if (res.routing != null) {
+                        _uiState.update { it.copy(lastRouting = res.routing) }
+                    }
                     if (res.modelContent != null) {
                         contents.put(res.modelContent)
                     }

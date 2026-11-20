@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { formatMonthLabel, getCurrentMonthKey, shiftMonthKey } from '../lib/formatters';
 
@@ -92,7 +93,7 @@ export function MonthYearPicker({ selectedMonth, onChange }: MonthYearPickerProp
           aria-expanded={open}
           aria-haspopup="dialog"
           title="Selecionar mês e ano"
-          className="inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-md transition-colors whitespace-nowrap min-w-[116px] sm:min-w-[158px]"
+          className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-md transition-colors whitespace-nowrap min-w-fit"
         >
           <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 shrink-0 hidden sm:inline" />
           <span className="tabular-nums">{formatMonthLabel(selectedMonth)}</span>
@@ -114,12 +115,17 @@ export function MonthYearPicker({ selectedMonth, onChange }: MonthYearPickerProp
         </button>
       </div>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Seletor de mês e ano"
-          className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-3.5 z-50 space-y-3"
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="dialog"
+            aria-label="Seletor de mês e ano"
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-3.5 z-50 space-y-3"
+          >
           {/* Year navigation + direct year input */}
           <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
             <button
@@ -206,8 +212,9 @@ export function MonthYearPicker({ selectedMonth, onChange }: MonthYearPickerProp
               <span>Mês atual ({formatMonthLabel(currentMonthKey)})</span>
             </button>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -13,9 +13,12 @@ import {
 import {
   ADMIN_EMAIL,
   AIProfileConfig,
+  AIRoutingDecision,
   DEFAULT_AI_PROFILE_ID,
   resolveAIProfile,
 } from './shared/aiProfiles.ts';
+import { resolveExecutionPlan } from './server/aiRouter.ts';
+import { getApiUsageSummary, recordModelApiUsage } from './server/aiUsageTracker.ts';
 import { collectDatabaseStats } from './server/adminDatabaseStats.ts';
 import {
   buildLinuxPackage,
@@ -39,6 +42,42 @@ const PORT = Number(process.env.PORT) || 3000;
 
 let cachedProfile: AIProfileConfig = resolveAIProfile(DEFAULT_AI_PROFILE_ID);
 let cacheExpiresAt = 0;
+
+interface VerifiedFirebaseUser {
+  uid: string;
+  email: string;
+  emailVerified: boolean;
+  isAdmin: boolean;
+}
+
+async function verifyFirebaseIdToken(idToken: string): Promise<VerifiedFirebaseUser | null> {
+  try {
+    const resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as {
+      users?: Array<{ localId?: string; email?: string; emailVerified?: boolean }>;
+    };
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
+    const email = (user.email ?? '').toLowerCase();
+    const emailVerified = Boolean(user.emailVerified);
+    return {
+      uid: user.localId,
+      email,
+      emailVerified,
+      isAdmin: emailVerified && email === ADMIN_EMAIL,
+    };
+  } catch {
+    return null;
+  }
+}
 
 async function resolveServerAIProfile(authHeader?: string): Promise<AIProfileConfig> {
   const now = Date.now();
@@ -74,27 +113,6 @@ async function resolveServerAIProfile(authHeader?: string): Promise<AIProfileCon
   return cachedProfile;
 }
 
-async function verifyAdminIdToken(idToken: string): Promise<boolean> {
-  try {
-    const resp = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      }
-    );
-    if (!resp.ok) return false;
-    const data = (await resp.json()) as {
-      users?: Array<{ email?: string; emailVerified?: boolean }>;
-    };
-    const user = data.users?.[0];
-    return Boolean(user?.emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL);
-  } catch {
-    return false;
-  }
-}
-
 function createGeminiClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -114,19 +132,19 @@ async function generateWithRetry(
   ai: GoogleGenAI,
   contents: Content[],
   systemInstruction: string,
-  profile: AIProfileConfig,
+  routing: AIRoutingDecision,
   maxRetries = 2
 ) {
   let lastError: unknown;
   const thinkingLevelValue =
-    profile.modelId === 'gemini-4-hydrogen' && profile.thinkingLevel !== 'MINIMAL'
-      ? ThinkingLevel[profile.thinkingLevel]
+    routing.selectedModel === 'gemini-4-hydrogen' && routing.selectedThinkingLevel !== 'MINIMAL'
+      ? ThinkingLevel[routing.selectedThinkingLevel]
       : undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await ai.models.generateContent({
-        model: profile.modelId,
+        model: routing.selectedModel,
         contents,
         config: {
           systemInstruction,
@@ -243,8 +261,8 @@ async function startServer() {
     }
 
     const idToken = authHeader.slice(7).trim();
-    const isAdminUser = await verifyAdminIdToken(idToken);
-    if (!isAdminUser) {
+    const verified = await verifyFirebaseIdToken(idToken);
+    if (!verified?.isAdmin) {
       res.status(403).json({ error: 'Acesso restrito ao administrador.' });
       return;
     }
@@ -260,6 +278,40 @@ async function startServer() {
     res.json({ ok: true, profile: cachedProfile });
   });
 
+  app.get('/api/assistant/usage', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Token de autenticação ausente.' });
+      return;
+    }
+
+    const idToken = authHeader.slice(7).trim();
+    const verified = await verifyFirebaseIdToken(idToken);
+    if (!verified) {
+      res.status(401).json({ error: 'Sessão inválida ou expirada.' });
+      return;
+    }
+
+    const activeProfile = await resolveServerAIProfile(authHeader);
+    const requestedScope = req.query.scope === 'global' ? 'global' : 'user';
+
+    try {
+      const summary = await getApiUsageSummary({
+        projectId: firebaseConfig.projectId,
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        authHeader,
+        uid: verified.uid,
+        isAdmin: verified.isAdmin,
+        requestedScope,
+        activeProfileId: activeProfile.id,
+      });
+      res.json(summary);
+    } catch (err) {
+      console.error('Erro na rota /api/assistant/usage:', err);
+      res.status(500).json({ error: 'Não foi possível consultar o uso da API.' });
+    }
+  });
+
   app.get('/api/admin/database-stats', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -268,8 +320,8 @@ async function startServer() {
     }
 
     const idToken = authHeader.slice(7).trim();
-    const isAdminUser = await verifyAdminIdToken(idToken);
-    if (!isAdminUser) {
+    const verified = await verifyFirebaseIdToken(idToken);
+    if (!verified?.isAdmin) {
       res.status(403).json({ error: 'Acesso restrito ao administrador.' });
       return;
     }
@@ -316,34 +368,92 @@ async function startServer() {
       return;
     }
 
-    const activeProfile = await resolveServerAIProfile(req.headers.authorization);
+    const authHeader = req.headers.authorization;
+    const idToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+
+    const [activeProfile, verifiedUser] = await Promise.all([
+      resolveServerAIProfile(authHeader),
+      idToken ? verifyFirebaseIdToken(idToken) : Promise.resolve(null),
+    ]);
+
+    const routing = resolveExecutionPlan(activeProfile, body.contents);
 
     const snapshotBlock = body.financialSnapshot
       ? `\n\n--- CONTEXTO FINANCEIRO ATUAL DO USUÁRIO ---\n${body.financialSnapshot}`
       : '';
 
     const fullSystemInstruction = `${ASSISTANT_SYSTEM_INSTRUCTION}${snapshotBlock}`;
+    const startedAt = Date.now();
 
     try {
       const response = await generateWithRetry(
         ai,
         body.contents,
         fullSystemInstruction,
-        activeProfile
+        routing
       );
+      const latencyMs = Math.max(1, Date.now() - startedAt);
       const modelContent = response.candidates?.[0]?.content ?? null;
       const functionCalls = response.functionCalls ?? [];
       const text = response.text ?? '';
+
+      const meta = response.usageMetadata;
+      const promptTokens = Number(meta?.promptTokenCount ?? 0);
+      const outputTokens = Number(meta?.candidatesTokenCount ?? 0);
+      const thinkingTokens = Number(meta?.thoughtsTokenCount ?? 0);
+      const totalTokens = Number(
+        meta?.totalTokenCount ?? promptTokens + outputTokens + thinkingTokens
+      );
+
+      // Persist real API usage asynchronously without delaying the response
+      void recordModelApiUsage({
+        projectId: firebaseConfig.projectId,
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        authHeader,
+        uid: verifiedUser?.uid ?? null,
+        modelId: routing.selectedModel,
+        complexity: routing.complexity,
+        inputTokens: promptTokens,
+        outputTokens,
+        thinkingTokens,
+        totalTokens,
+        latencyMs,
+        isError: false,
+      });
 
       res.json({
         text,
         functionCalls,
         modelContent,
         profileId: activeProfile.id,
+        routing,
+        usage: {
+          promptTokens,
+          outputTokens,
+          thinkingTokens,
+          totalTokens,
+          latencyMs,
+        },
       });
     } catch (err) {
+      const latencyMs = Math.max(1, Date.now() - startedAt);
+      void recordModelApiUsage({
+        projectId: firebaseConfig.projectId,
+        databaseId: firebaseConfig.firestoreDatabaseId,
+        authHeader,
+        uid: verifiedUser?.uid ?? null,
+        modelId: routing.selectedModel,
+        complexity: routing.complexity,
+        inputTokens: 0,
+        outputTokens: 0,
+        thinkingTokens: 0,
+        totalTokens: 0,
+        latencyMs,
+        isError: true,
+      });
+
       console.error('Erro na rota /api/assistant/chat:', err);
-      const mapped = mapGeminiError(err, activeProfile.modelId);
+      const mapped = mapGeminiError(err, routing.selectedModel);
       res.status(mapped.status).json({
         code: mapped.code,
         error: mapped.message,

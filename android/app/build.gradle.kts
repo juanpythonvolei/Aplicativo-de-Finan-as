@@ -12,8 +12,8 @@ android {
         applicationId = "com.verticefinance.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.1.0"
     }
 
     buildTypes {
@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.firebase.firestore)
 
     implementation(libs.androidx.credentials)
-    implementation(libs.androidx.credentials.play-services)
+    implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
 }

@@ -157,6 +157,7 @@ export async function collectDatabaseStats(options: {
     { key: 'budgets', label: 'Orçamentos' },
     { key: 'goals', label: 'Metas' },
     { key: 'aiConversations', label: 'Conversas IA' },
+    { key: 'aiUsage', label: 'Uso de API (IA)' },
     { key: 'private', label: 'Perfis Privados' },
   ];
 

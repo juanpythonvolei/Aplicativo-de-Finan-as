@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
   Bot,
@@ -22,7 +24,9 @@ import {
   useAssistantChat,
 } from '../hooks/useAssistantChat';
 import { formatCurrency } from '../lib/formatters';
+import { resolveAIProfile } from '../../shared/aiProfiles';
 import { FormattedAssistantText } from './AssistantMarkdown';
+import { DepthCard } from './DepthCard';
 
 function formatConversationTimestamp(ts: { toDate?: () => Date } | null): string {
   if (!ts?.toDate) return 'Agora';
@@ -39,7 +43,8 @@ function formatConversationTimestamp(ts: { toDate?: () => Date } | null): string
 }
 
 export function AssistantMainView(props: AssistantControllerCallbacks) {
-  const { accounts, transactions, selectedMonth, currency } = useFinance();
+  const { accounts, transactions, selectedMonth, currency, assistantProfileId } = useFinance();
+  const activeProfile = useMemo(() => resolveAIProfile(assistantProfileId), [assistantProfileId]);
   const chat = useAssistantChat(props);
 
   const [historyOpenMobile, setHistoryOpenMobile] = useState(false);
@@ -151,11 +156,11 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {filteredConversations.length === 0 ? (
-          <div className="px-3 py-8 text-center space-y-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <div className="px-3 py-8 text-center space-y-1.5">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
               {searchQuery ? 'Nenhuma conversa encontrada' : 'Histórico vazio'}
             </p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
               {searchQuery
                 ? 'Tente outro termo de busca.'
                 : 'Suas conversas com a IA serão salvas automaticamente aqui.'}
@@ -210,7 +215,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                   </form>
                 ) : isConfirmingDelete ? (
                   <div className="p-2.5 space-y-2">
-                    <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200 leading-snug">
                       Excluir esta conversa permanentemente?
                     </p>
                     <div className="flex items-center gap-1.5">
@@ -220,14 +225,14 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                           setConfirmDeleteId(null);
                           await chat.deleteConversation(conv.id);
                         }}
-                        className="px-2.5 py-1 text-[11px] font-medium rounded bg-red-600 hover:bg-red-700 text-white"
+                        className="px-2.5 py-1 text-xs font-medium rounded bg-red-600 hover:bg-red-700 text-white"
                       >
                         Excluir
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(null)}
-                        className="px-2.5 py-1 text-[11px] font-medium rounded border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                        className="px-2.5 py-1 text-xs font-medium rounded border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                       >
                         Cancelar
                       </button>
@@ -241,7 +246,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                         chat.selectConversation(conv.id);
                         setHistoryOpenMobile(false);
                       }}
-                      className="flex-1 min-w-0 text-left space-y-0.5"
+                      className="flex-1 min-w-0 text-left space-y-1"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p
@@ -253,11 +258,11 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                         >
                           {conv.title}
                         </p>
-                        <span className="text-[10px] font-mono tabular-nums text-slate-400 shrink-0">
+                        <span className="text-xs font-mono tabular-nums text-slate-400 shrink-0">
                           {formatConversationTimestamp(conv.lastMessageAt)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         {conv.preview || `${conv.messageCount} mensagem(ns)`}
                       </p>
                     </button>
@@ -293,8 +298,8 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
         )}
       </div>
 
-      <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
-        <span>{chat.conversations.length} conversa(s) salva(s)</span>
+      <div className="px-3 py-2.5 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+        <span>{chat.conversations.length} conversa(s)</span>
         <span className="hidden sm:inline font-mono">Ctrl+K</span>
       </div>
     </div>
@@ -306,7 +311,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
       <div className="px-4 sm:px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 flex items-center justify-between gap-4 shrink-0 overflow-x-auto">
         <div className="flex items-center gap-5 sm:gap-7 min-w-0 shrink-0">
           <div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
               Saldo Consolidado
             </p>
             <p className="font-mono text-sm font-semibold text-slate-900 dark:text-white tabular-nums whitespace-nowrap">
@@ -317,7 +322,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
           <div className="h-7 w-px bg-slate-200 dark:bg-slate-800 shrink-0" aria-hidden="true" />
 
           <div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
               Receitas ({selectedMonth})
             </p>
             <p className="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums whitespace-nowrap">
@@ -326,7 +331,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
           </div>
 
           <div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
               Despesas ({selectedMonth})
             </p>
             <p className="font-mono text-sm font-semibold text-red-600 dark:text-red-400 tabular-nums whitespace-nowrap">
@@ -340,7 +345,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
               onClick={() => props.onNavigate('transactions')}
               className="hidden sm:block text-left hover:underline"
             >
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 whitespace-nowrap">
+              <p className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
                 Pendências
               </p>
               <p className="font-mono text-sm font-semibold text-amber-800 dark:text-amber-300 tabular-nums whitespace-nowrap">
@@ -400,24 +405,40 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                 <h2 className="font-display text-sm font-semibold text-slate-900 dark:text-white truncate">
                   {chat.activeConversation?.title || 'Nova conversa com o Assistente Vértice'}
                 </h2>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                  Centro de comando financeiro · Conversas salvas e sincronizadas em todos os dispositivos
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {chat.lastRouting
+                    ? `${chat.lastRouting.selectedModel} · ${chat.lastRouting.complexityLabel} · ${chat.lastRouting.reason}`
+                    : `${activeProfile.label} · Conversas sincronizadas em todos os dispositivos`}
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                chat.startNewConversation();
-                textareaRef.current?.focus();
-              }}
-              title="Iniciar nova conversa (Ctrl+K)"
-              className="md:hidden inline-flex items-center gap-1 px-2.5 py-2 min-h-[40px] rounded-lg bg-teal-700 text-white text-xs font-medium shrink-0"
-            >
-              <MessageSquarePlus className="w-4 h-4" />
-              <span>Nova</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {props.onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={() => props.onOpenSettings?.('usage')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 min-h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-teal-600 dark:hover:border-teal-500 hover:text-teal-700 dark:hover:text-teal-400 transition-colors whitespace-nowrap"
+                >
+                  <Activity className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 shrink-0" />
+                  <span className="hidden sm:inline">Uso de API</span>
+                  <span className="sm:hidden">API</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  chat.startNewConversation();
+                  textareaRef.current?.focus();
+                }}
+                title="Iniciar nova conversa (Ctrl+K)"
+                className="md:hidden inline-flex items-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg bg-teal-700 text-white text-xs font-medium shrink-0"
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                <span>Nova</span>
+              </button>
+            </div>
           </div>
 
           {/* Messages Stream */}
@@ -442,35 +463,44 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                     </p>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       Comandos rápidos
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {QUICK_PROMPTS.map((prompt) => (
-                        <button
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {QUICK_PROMPTS.map((prompt, idx) => (
+                        <DepthCard
                           key={prompt}
-                          type="button"
-                          onClick={() => chat.sendMessage(prompt)}
-                          disabled={chat.sending}
-                          className="text-left px-4 py-3 min-h-[48px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 hover:border-teal-600 dark:hover:border-teal-500 hover:bg-teal-50/40 dark:hover:bg-teal-950/30 text-xs font-medium text-slate-700 dark:text-slate-200 leading-relaxed transition-colors"
+                          delay={idx * 0.04}
+                          tiltStrength={3}
+                          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 hover:border-teal-600 dark:hover:border-teal-500"
                         >
-                          {prompt}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => chat.sendMessage(prompt)}
+                            disabled={chat.sending}
+                            className="w-full h-full text-left px-4 py-3.5 min-h-[54px] text-xs font-medium text-slate-700 dark:text-slate-200 leading-relaxed transition-colors"
+                          >
+                            {prompt}
+                          </button>
+                        </DepthCard>
                       ))}
                     </div>
                   </div>
                 </div>
               ) : (
                 chat.messages.map((msg) => (
-                  <div
+                  <motion.div
                     key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     className={`flex flex-col gap-2 ${
                       msg.role === 'user' ? 'items-end' : 'items-start'
                     }`}
                   >
                     {msg.role === 'user' ? (
-                      <div className="max-w-[88%] sm:max-w-[78%] rounded-2xl rounded-br-sm bg-teal-700 text-white px-4 py-3 text-sm space-y-2">
+                      <div className="max-w-[88%] sm:max-w-[78%] rounded-2xl rounded-br-sm bg-teal-700 text-white px-4 py-3 text-sm space-y-2 shadow-sm">
                         {msg.imagePreview && (
                           <img
                             src={msg.imagePreview}
@@ -479,7 +509,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                           />
                         )}
                         {!msg.imagePreview && msg.hasImage && (
-                          <p className="text-[11px] text-teal-100/90 font-mono">
+                          <p className="text-xs text-teal-100/90 font-mono">
                             [Imagem anexada nesta mensagem]
                           </p>
                         )}
@@ -508,9 +538,21 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                           </div>
                         )}
 
-                        <div className="rounded-2xl rounded-tl-sm border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 px-4 py-3.5">
+                        <div className="rounded-2xl rounded-tl-sm border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 px-4 py-3.5 depth-panel">
                           <FormattedAssistantText text={msg.text} />
                         </div>
+
+                        {msg.routing && (
+                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400 px-1 tabular-nums leading-relaxed">
+                            {msg.routing.isDynamic ? 'Roteamento autônomo' : 'Perfil fixo'} ·{' '}
+                            {msg.routing.selectedModel} ({msg.routing.selectedThinkingLevel}) ·
+                            Complexidade {msg.routing.complexityLabel} ({msg.routing.score}/100)
+                            {msg.usageTokens
+                              ? ` · ${msg.usageTokens.toLocaleString('pt-BR')} tokens`
+                              : ''}
+                            {msg.latencyMs ? ` · ${msg.latencyMs} ms` : ''}
+                          </p>
+                        )}
 
                         {msg.confirmations && msg.confirmations.length > 0 && (
                           <div className="space-y-2">
@@ -566,7 +608,7 @@ export function AssistantMainView(props: AssistantControllerCallbacks) {
                         )}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 ))
               )}
 

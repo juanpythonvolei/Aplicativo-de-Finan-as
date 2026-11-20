@@ -657,13 +657,13 @@ export const ASSISTANT_FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'open_settings',
     description:
-      'Abre a janela de Configurações e Conta do aplicativo diretamente na seção desejada (Preferências de moeda/tema, Perfil, Segurança, IA Admin ou Banco Admin).',
+      'Abre a janela de Configurações e Conta do aplicativo diretamente na seção desejada (Preferências de moeda/tema, Perfil, Segurança, Uso de API por modelo, IA Admin ou Banco Admin).',
     parameters: {
       type: Type.OBJECT,
       properties: {
         section: {
           type: Type.STRING,
-          description: 'Seção alvo: preferences, profile, security, ai ou database.',
+          description: 'Seção alvo: preferences, profile, security, usage, ai ou database.',
         },
       },
     },

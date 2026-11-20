@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { AccountSecurityModal } from './components/AccountSecurityModal';
@@ -216,46 +217,62 @@ function AppShell() {
           onOpenAssistant={() => setChatOpen(true)}
         />
 
-        {activeTab === 'assistant' ? (
-          <main className="flex-1 min-h-0">
-            <AssistantMainView
-              onNavigate={setActiveTab}
-              onOpenSettings={handleOpenSettings}
-              onOpenTransactionForm={handleOpenTransactionFormFromAI}
-              onOpenAccountForm={handleOpenAccountFormFromAI}
-              onOpenBudgetForm={handleOpenBudgetFormFromAI}
-              onOpenGoalForm={handleOpenGoalFormFromAI}
-              onOpenCategoryForm={handleOpenCategoryFormFromAI}
-              onApplyTransactionsFilter={handleApplyTransactionsFilterFromAI}
-              onSetReportsRange={handleSetReportsRangeFromAI}
-            />
-          </main>
-        ) : (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-[1380px] w-full mx-auto">
-            {activeTab === 'dashboard' && (
-              <DashboardView onNavigate={setActiveTab} onEditTransaction={openEditTx} />
-            )}
-            {activeTab === 'transactions' && (
-              <TransactionsView
-                onNewTransaction={openNewTx}
-                onEditTransaction={openEditTx}
-                filterDraft={txFilterDraft}
+        <AnimatePresence mode="wait">
+          {activeTab === 'assistant' ? (
+            <motion.main
+              key="view-assistant"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="flex-1 min-h-0"
+            >
+              <AssistantMainView
+                onNavigate={setActiveTab}
+                onOpenSettings={handleOpenSettings}
+                onOpenTransactionForm={handleOpenTransactionFormFromAI}
+                onOpenAccountForm={handleOpenAccountFormFromAI}
+                onOpenBudgetForm={handleOpenBudgetFormFromAI}
+                onOpenGoalForm={handleOpenGoalFormFromAI}
+                onOpenCategoryForm={handleOpenCategoryFormFromAI}
+                onApplyTransactionsFilter={handleApplyTransactionsFilterFromAI}
+                onSetReportsRange={handleSetReportsRangeFromAI}
               />
-            )}
-            {activeTab === 'accounts' && (
-              <AccountsView
-                onPayCreditCard={openPayCreditCard}
-                onQuickTransfer={openQuickTransfer}
-                externalDraft={accountFormDraft}
-              />
-            )}
-            {activeTab === 'budgets' && <BudgetsView externalDraft={budgetFormDraft} />}
-            {activeTab === 'goals' && <GoalsView externalDraft={goalFormDraft} />}
-            {activeTab === 'reports' && <ReportsView externalMonthsCount={reportsRangeDraft} />}
-            {activeTab === 'categories' && <CategoriesView externalDraft={categoryFormDraft} />}
-            {activeTab === 'downloads' && <DownloadsView />}
-          </main>
-        )}
+            </motion.main>
+          ) : (
+            <motion.main
+              key={`view-${activeTab}`}
+              initial={{ opacity: 0, y: 10, scale: 0.992 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.995 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-[1380px] w-full mx-auto"
+            >
+              {activeTab === 'dashboard' && (
+                <DashboardView onNavigate={setActiveTab} onEditTransaction={openEditTx} />
+              )}
+              {activeTab === 'transactions' && (
+                <TransactionsView
+                  onNewTransaction={openNewTx}
+                  onEditTransaction={openEditTx}
+                  filterDraft={txFilterDraft}
+                />
+              )}
+              {activeTab === 'accounts' && (
+                <AccountsView
+                  onPayCreditCard={openPayCreditCard}
+                  onQuickTransfer={openQuickTransfer}
+                  externalDraft={accountFormDraft}
+                />
+              )}
+              {activeTab === 'budgets' && <BudgetsView externalDraft={budgetFormDraft} />}
+              {activeTab === 'goals' && <GoalsView externalDraft={goalFormDraft} />}
+              {activeTab === 'reports' && <ReportsView externalMonthsCount={reportsRangeDraft} />}
+              {activeTab === 'categories' && <CategoriesView externalDraft={categoryFormDraft} />}
+              {activeTab === 'downloads' && <DownloadsView />}
+            </motion.main>
+          )}
+        </AnimatePresence>
       </div>
 
       <MobileBottomNav
@@ -301,12 +318,16 @@ function AppShell() {
       />
 
       {/* Toast Stack */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-20 lg:bottom-4 right-4 z-50 space-y-2 max-w-sm w-full px-4 sm:px-0">
+      <div className="fixed bottom-20 lg:bottom-4 right-4 z-50 space-y-2 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
+        <AnimatePresence initial={false}>
           {toasts.map((toast) => (
-            <div
+            <motion.div
               key={toast.id}
-              className={`px-4 py-3 rounded-lg border text-xs font-medium flex items-center justify-between gap-3 shadow-sm ${
+              initial={{ opacity: 0, y: 14, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className={`pointer-events-auto px-4 py-3 rounded-xl border text-xs font-medium flex items-center justify-between gap-3 shadow-md ${
                 toast.type === 'error'
                   ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200'
                   : toast.type === 'success'
@@ -314,7 +335,7 @@ function AppShell() {
                   : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100'
               }`}
             >
-              <span>{toast.text}</span>
+              <span className="leading-snug">{toast.text}</span>
               <button
                 type="button"
                 onClick={() => dismissToast(toast.id)}
@@ -323,10 +344,10 @@ function AppShell() {
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </motion.div>
           ))}
-        </div>
-      )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

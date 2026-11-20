@@ -12,6 +12,7 @@ import { formatCurrency, formatShortDate } from '../lib/formatters';
 import { Transaction, ViewTab } from '../types/finance';
 import { CashFlowChart } from './CashFlowChart';
 import { CategoryDonut } from './CategoryDonut';
+import { DepthCard } from './DepthCard';
 
 interface DashboardViewProps {
   onNavigate: (tab: ViewTab) => void;
@@ -164,7 +165,7 @@ export function DashboardView({ onNavigate, onEditTransaction }: DashboardViewPr
   return (
     <div className="space-y-6">
       {accounts.length === 0 && transactions.length === 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-1.5 max-w-2xl">
             <h2 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
               Bem-vindo ao seu painel financeiro
@@ -196,83 +197,103 @@ export function DashboardView({ onNavigate, onEditTransaction }: DashboardViewPr
 
       {/* KPI Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            Patrimônio Líquido Consolidado
-          </p>
-          <p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
-            {formatCurrency(kpis.consolidatedBalance, currency)}
-          </p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            Ativos {formatCurrency(kpis.liquidAssets, currency)} · Faturas{' '}
-            {formatCurrency(kpis.creditDebt, currency)}
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Receitas do Mês
+        <DepthCard
+          delay={0}
+          className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
+        >
+          <div className="min-w-0 flex flex-col justify-between h-full">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-snug">
+              Patrimônio Líquido Consolidado
             </p>
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              Entrada
-            </span>
+            <p className="mt-2 font-mono text-xl xl:text-2xl font-semibold tabular-nums break-words text-slate-900 dark:text-white">
+              {formatCurrency(kpis.consolidatedBalance, currency)}
+            </p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums leading-relaxed">
+              Ativos {formatCurrency(kpis.liquidAssets, currency)} · Faturas{' '}
+              {formatCurrency(kpis.creditDebt, currency)}
+            </p>
           </div>
-          <p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-            {formatCurrency(kpis.monthIncome, currency)}
-          </p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            Efetivado: {formatCurrency(kpis.monthIncomePaid, currency)}
-          </p>
-        </div>
+        </DepthCard>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Despesas do Mês
+        <DepthCard
+          delay={0.04}
+          className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
+        >
+          <div className="min-w-0 flex flex-col justify-between h-full">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Receitas do Mês
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 shrink-0">
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                Entrada
+              </span>
+            </div>
+            <p className="mt-2 font-mono text-xl xl:text-2xl font-semibold tabular-nums break-words text-emerald-700 dark:text-emerald-400">
+              {formatCurrency(kpis.monthIncome, currency)}
             </p>
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
-              <ArrowDownRight className="w-3.5 h-3.5" />
-              Saída
-            </span>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums leading-relaxed">
+              Efetivado: {formatCurrency(kpis.monthIncomePaid, currency)}
+            </p>
           </div>
-          <p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
-            {formatCurrency(kpis.monthExpense, currency)}
-          </p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            Pago: {formatCurrency(kpis.monthExpensePaid, currency)}
-          </p>
-        </div>
+        </DepthCard>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Balanço & Poupança
+        <DepthCard
+          delay={0.08}
+          className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
+        >
+          <div className="min-w-0 flex flex-col justify-between h-full">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Despesas do Mês
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400 shrink-0">
+                <ArrowDownRight className="w-3.5 h-3.5" />
+                Saída
+              </span>
+            </div>
+            <p className="mt-2 font-mono text-xl xl:text-2xl font-semibold tabular-nums break-words text-slate-900 dark:text-white">
+              {formatCurrency(kpis.monthExpense, currency)}
             </p>
-            <span
-              className={`text-xs font-mono font-medium tabular-nums ${
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums leading-relaxed">
+              Pago: {formatCurrency(kpis.monthExpensePaid, currency)}
+            </p>
+          </div>
+        </DepthCard>
+
+        <DepthCard
+          delay={0.12}
+          className="h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5"
+        >
+          <div className="min-w-0 flex flex-col justify-between h-full">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Balanço & Poupança
+              </p>
+              <span
+                className={`text-xs font-mono font-medium tabular-nums shrink-0 ${
+                  kpis.netResult >= 0
+                    ? 'text-teal-700 dark:text-teal-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {kpis.savingsRate.toFixed(1)}%
+              </span>
+            </div>
+            <p
+              className={`mt-2 font-mono text-xl xl:text-2xl font-semibold tabular-nums break-words ${
                 kpis.netResult >= 0
                   ? 'text-teal-700 dark:text-teal-400'
                   : 'text-red-600 dark:text-red-400'
               }`}
             >
-              {kpis.savingsRate.toFixed(1)}%
-            </span>
+              {formatCurrency(kpis.netResult, currency)}
+            </p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {kpis.netResult >= 0 ? 'Superávit no período' : 'Déficit no período'}
+            </p>
           </div>
-          <p
-            className={`mt-2 font-mono text-2xl font-semibold tabular-nums ${
-              kpis.netResult >= 0
-                ? 'text-teal-700 dark:text-teal-400'
-                : 'text-red-600 dark:text-red-400'
-            }`}
-          >
-            {formatCurrency(kpis.netResult, currency)}
-          </p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            {kpis.netResult >= 0 ? 'Superávit no período' : 'Déficit no período'}
-          </p>
-        </div>
+        </DepthCard>
       </div>
 
       {/* Main Analytics Split */}
@@ -287,7 +308,7 @@ export function DashboardView({ onNavigate, onEditTransaction }: DashboardViewPr
 
       {/* Secondary Operational Split: Pending Bills + Budgets & Goals */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+        <div className="lg:col-span-6 depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -359,7 +380,7 @@ export function DashboardView({ onNavigate, onEditTransaction }: DashboardViewPr
           )}
         </div>
 
-        <div className="lg:col-span-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
+        <div className="lg:col-span-6 depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6">
           <div>
             <div className="flex items-center justify-between gap-4 mb-3">
               <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
@@ -473,7 +494,7 @@ export function DashboardView({ onNavigate, onEditTransaction }: DashboardViewPr
       </div>
 
       {/* Recent Ledger Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      <div className="depth-panel bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
           <h2 className="font-display text-base font-semibold text-slate-900 dark:text-white">
             Lançamentos do Mês

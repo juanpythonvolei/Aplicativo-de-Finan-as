@@ -388,15 +388,15 @@
       "properties": {
         "profileId": {
           "type": "string",
-          "enum": ["economic_smart", "ultra_lite", "balanced", "deep"]
+          "enum": ["auto_dynamic", "economic_smart", "ultra_lite", "balanced", "deep"]
         },
         "modelId": {
           "type": "string",
-          "enum": ["gemini-4-hydrogen", "gemini-3.1-flash-lite"]
+          "enum": ["auto", "gemini-4-hydrogen", "gemini-3.1-flash-lite"]
         },
         "thinkingLevel": {
           "type": "string",
-          "enum": ["LOW", "MEDIUM", "HIGH", "MINIMAL"]
+          "enum": ["DYNAMIC", "LOW", "MEDIUM", "HIGH", "MINIMAL"]
         },
         "updatedBy": {
           "type": "string",
@@ -505,6 +505,55 @@
         "hasImage",
         "createdAt"
       ]
+    },
+    "AIModelUsage": {
+      "title": "AIModelUsage",
+      "description": "Persisted per-user, per-model real Gemini API consumption counters and latency aggregates.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "modelId": {
+          "type": "string",
+          "enum": ["gemini-4-hydrogen", "gemini-3.1-flash-lite"]
+        },
+        "requests": { "type": "number" },
+        "inputTokens": { "type": "number" },
+        "outputTokens": { "type": "number" },
+        "thinkingTokens": { "type": "number" },
+        "totalTokens": { "type": "number" },
+        "totalLatencyMs": { "type": "number" },
+        "errorCount": { "type": "number" },
+        "simpleCount": { "type": "number" },
+        "moderateCount": { "type": "number" },
+        "complexCount": { "type": "number" },
+        "criticalCount": { "type": "number" },
+        "lastUsedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "modelId",
+        "requests",
+        "inputTokens",
+        "outputTokens",
+        "thinkingTokens",
+        "totalTokens",
+        "totalLatencyMs",
+        "errorCount",
+        "simpleCount",
+        "moderateCount",
+        "complexCount",
+        "criticalCount",
+        "lastUsedAt",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -547,6 +596,10 @@
     "/users/{userId}/aiConversations/{conversationId}/messages/{messageId}": {
       "schema": { "$ref": "#/entities/AIConversationMessage" },
       "description": "Persisted messages within an AI assistant conversation."
+    },
+    "/users/{userId}/aiUsage/{modelKey}": {
+      "schema": { "$ref": "#/entities/AIModelUsage" },
+      "description": "Persisted per-model real Gemini API consumption aggregates for the user."
     }
   }
 }

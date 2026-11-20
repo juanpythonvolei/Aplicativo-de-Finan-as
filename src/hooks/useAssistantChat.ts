@@ -22,6 +22,7 @@ import {
   TransactionsFilterDraft,
   ViewTab,
 } from '../types/finance';
+import type { AIRoutingDecision } from '../../shared/aiProfiles';
 
 export interface AssistantControllerCallbacks {
   onNavigate: (tab: ViewTab) => void;
@@ -44,6 +45,9 @@ export interface ChatDisplayMessage {
   hasImage?: boolean;
   actionsSummary?: string[];
   modelProfileId?: string;
+  routing?: AIRoutingDecision;
+  usageTokens?: number;
+  latencyMs?: number;
   confirmations?: PendingConfirmation[];
 }
 
@@ -91,6 +95,10 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
   const [localConfirmations, setLocalConfirmations] = useState<
     Record<string, PendingConfirmation[]>
   >({});
+  const [localRouting, setLocalRouting] = useState<
+    Record<string, { routing: AIRoutingDecision; totalTokens?: number; latencyMs?: number }>
+  >({});
+  const [lastRouting, setLastRouting] = useState<AIRoutingDecision | null>(null);
 
   const runtimeCtx = useMemo<AssistantRuntimeContext>(
     () => ({
@@ -153,6 +161,9 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
       imagePreview: localPreviews[m.id],
       actionsSummary: m.actionsSummary,
       modelProfileId: m.modelProfileId,
+      routing: localRouting[m.id]?.routing,
+      usageTokens: localRouting[m.id]?.totalTokens,
+      latencyMs: localRouting[m.id]?.latencyMs,
       confirmations: localConfirmations[m.id],
     }));
     if (transientError) {
@@ -163,7 +174,13 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
       });
     }
     return base;
-  }, [finance.activeConversationMessages, localPreviews, localConfirmations, transientError]);
+  }, [
+    finance.activeConversationMessages,
+    localPreviews,
+    localConfirmations,
+    localRouting,
+    transientError,
+  ]);
 
   const handleImagePick = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,6 +263,14 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
     functionCalls: GeminiFunctionCall[];
     modelContent: GeminiContent | null;
     profileId?: string;
+    routing?: AIRoutingDecision;
+    usage?: {
+      promptTokens: number;
+      outputTokens: number;
+      thinkingTokens: number;
+      totalTokens: number;
+      latencyMs: number;
+    };
   }> => {
     const idToken = await auth.currentUser?.getIdToken().catch(() => null);
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -324,12 +349,23 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
         const collectedConfirmations: PendingConfirmation[] = [];
         let finalText = '';
         let resolvedProfileId = finance.assistantProfileId;
+        let stepRouting: AIRoutingDecision | undefined;
+        let accumulatedTokens = 0;
+        let accumulatedLatency = 0;
 
         for (let step = 0; step < 8; step++) {
           const snapshot = buildFinancialSnapshot(runtimeCtxRef.current);
           const result = await callAssistantApi(workingHistory, snapshot);
           if (result.profileId) {
             resolvedProfileId = result.profileId as typeof resolvedProfileId;
+          }
+          if (result.routing) {
+            stepRouting = result.routing;
+            setLastRouting(result.routing);
+          }
+          if (result.usage) {
+            accumulatedTokens += result.usage.totalTokens || 0;
+            accumulatedLatency += result.usage.latencyMs || 0;
           }
 
           if (result.modelContent) {
@@ -379,10 +415,22 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
           nextMessageCount: countAfterUser + 1,
         });
 
+        const resolvedMsgKey = assistantMsgId || generateSafeId('msg');
+        if (stepRouting) {
+          setLocalRouting((prev) => ({
+            ...prev,
+            [resolvedMsgKey]: {
+              routing: stepRouting!,
+              totalTokens: accumulatedTokens,
+              latencyMs: accumulatedLatency,
+            },
+          }));
+        }
+
         if (collectedConfirmations.length > 0) {
           setLocalConfirmations((prev) => ({
             ...prev,
-            [assistantMsgId || generateSafeId('msg')]: collectedConfirmations,
+            [resolvedMsgKey]: collectedConfirmations,
           }));
         }
       } catch (err) {
@@ -418,5 +466,6 @@ export function useAssistantChat(callbacks: AssistantControllerCallbacks) {
     renameConversation: finance.renameAIConversation,
     deleteConversation: finance.deleteAIConversation,
     resolveConfirmation,
+    lastRouting,
   };
 }

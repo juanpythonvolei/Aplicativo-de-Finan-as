@@ -1650,7 +1650,14 @@ export async function executeAssistantToolCall(
 
     case 'open_settings': {
       const rawSec = normalizeStr(args.section) as SettingsSection | '';
-      const validSections: SettingsSection[] = ['preferences', 'profile', 'security', 'ai', 'database'];
+      const validSections: SettingsSection[] = [
+        'preferences',
+        'profile',
+        'security',
+        'usage',
+        'ai',
+        'database',
+      ];
       const section: SettingsSection = validSections.includes(rawSec as SettingsSection)
         ? (rawSec as SettingsSection)
         : 'preferences';

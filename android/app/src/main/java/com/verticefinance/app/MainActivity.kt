@@ -4,6 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -79,7 +85,10 @@ class MainActivity : ComponentActivity() {
                                     IconButton(onClick = { viewModel.shiftMonth(1) }) {
                                         Icon(Icons.Outlined.ChevronRight, contentDescription = "Próximo mês")
                                     }
-                                    IconButton(onClick = { showSettings = true }) {
+                                    IconButton(onClick = {
+                                        showSettings = true
+                                        viewModel.refreshApiUsage()
+                                    }) {
                                         Icon(Icons.Outlined.Settings, contentDescription = "Configurações")
                                     }
                                 }
@@ -132,36 +141,47 @@ class MainActivity : ComponentActivity() {
                         }
                     ) { innerPadding ->
                         Box(modifier = Modifier.padding(innerPadding)) {
-                            when (currentTab) {
-                                0 -> AssistantScreen(
-                                    state = state,
-                                    onSendMessage = { viewModel.sendAIMessage(it) },
-                                    onNewConversation = { viewModel.startNewConversation() },
-                                    onSelectConversation = { viewModel.selectConversation(it) },
-                                    onDeleteConversation = { viewModel.deleteConversation(it) },
-                                    onOpenDashboard = { currentTab = 1 }
-                                )
-                                1 -> DashboardScreen(
-                                    state = state,
-                                    onTogglePaid = { viewModel.toggleTransactionStatus(it) }
-                                )
-                                2 -> TransactionsScreen(
-                                    state = state,
-                                    onToggleStatus = { viewModel.toggleTransactionStatus(it) },
-                                    onDelete = { viewModel.deleteTransaction(it) }
-                                )
-                                3 -> AccountsScreen(
-                                    state = state,
-                                    onCreateAccount = { n, t, i, b, l, c, d ->
-                                        viewModel.createAccount(n, t, i, b, l, c, d)
-                                    }
-                                )
-                                4 -> BudgetsGoalsScreen(
-                                    state = state,
-                                    onContributeGoal = { goal, amt ->
-                                        viewModel.contributeToGoal(goal, amt)
-                                    }
-                                )
+                            AnimatedContent(
+                                targetState = currentTab,
+                                transitionSpec = {
+                                    (fadeIn(tween(220)) + scaleIn(
+                                        initialScale = 0.985f,
+                                        animationSpec = tween(220)
+                                    )).togetherWith(fadeOut(tween(150)))
+                                },
+                                label = "tabTransition"
+                            ) { tab ->
+                                when (tab) {
+                                    0 -> AssistantScreen(
+                                        state = state,
+                                        onSendMessage = { viewModel.sendAIMessage(it) },
+                                        onNewConversation = { viewModel.startNewConversation() },
+                                        onSelectConversation = { viewModel.selectConversation(it) },
+                                        onDeleteConversation = { viewModel.deleteConversation(it) },
+                                        onOpenDashboard = { currentTab = 1 }
+                                    )
+                                    1 -> DashboardScreen(
+                                        state = state,
+                                        onTogglePaid = { viewModel.toggleTransactionStatus(it) }
+                                    )
+                                    2 -> TransactionsScreen(
+                                        state = state,
+                                        onToggleStatus = { viewModel.toggleTransactionStatus(it) },
+                                        onDelete = { viewModel.deleteTransaction(it) }
+                                    )
+                                    3 -> AccountsScreen(
+                                        state = state,
+                                        onCreateAccount = { n, t, i, b, l, c, d ->
+                                            viewModel.createAccount(n, t, i, b, l, c, d)
+                                        }
+                                    )
+                                    4 -> BudgetsGoalsScreen(
+                                        state = state,
+                                        onContributeGoal = { goal, amt ->
+                                            viewModel.contributeToGoal(goal, amt)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -185,6 +205,9 @@ class MainActivity : ComponentActivity() {
                             currency = state.currency,
                             theme = state.theme,
                             userEmail = state.user?.email ?: "",
+                            apiUsage = state.apiUsage,
+                            apiUsageLoading = state.apiUsageLoading,
+                            onRefreshApiUsage = { viewModel.refreshApiUsage() },
                             onSelectCurrency = { viewModel.setCurrency(it) },
                             onSelectTheme = { viewModel.setTheme(it) },
                             onSignOut = { viewModel.signOut() },

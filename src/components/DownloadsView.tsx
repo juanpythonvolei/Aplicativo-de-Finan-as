@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../contexts/FinanceContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { DepthCard } from './DepthCard';
 
 type PlatformId = 'linux' | 'windows' | 'android';
 
@@ -25,7 +26,9 @@ const DEFAULT_GITHUB_REPO = 'juanpythonvolei/Aplicativo-de-Finan-as';
 
 const CONFIGURED_GITHUB_REPO = (import.meta.env.VITE_GITHUB_REPO || DEFAULT_GITHUB_REPO)
   .trim()
-  .replace(/^\/+|\/+$/g, '');
+  .replace(/^https?:\/\/github\.com\//i, '')
+  .replace(/^\/+|\/+$/g, '')
+  .replace(/\.git$/i, '');
 
 const ANDROID_APK_RELEASE_URL =
   (import.meta.env.VITE_ANDROID_APK_URL || '').trim() ||
@@ -51,14 +54,14 @@ const PLATFORMS: PlatformCardConfig[] = [
     name: 'Linux Desktop',
     subtitle: 'Ubuntu, Debian, Fedora, Arch, Mint e derivados',
     endpoint: '/api/downloads/linux',
-    defaultFilename: 'vertice-finance-linux-2.0.0.tar.gz',
-    formatLabel: 'Arquivo .tar.gz · Instalador Desktop',
+    defaultFilename: 'vertice-finance-linux-2.1.0.tar.gz',
+    formatLabel: 'Arquivo .tar.gz · Instalador Desktop v2.1.0',
     buttonLabel: 'Baixar para Linux',
     icon: Terminal,
     includes: [
-      'Script install.sh em 1 comando + desinstalador uninstall.sh',
-      'Atalho nativo (.desktop) em janela dedicada sem barra do navegador',
-      'Ícone vetorial oficial instalado no menu de aplicativos',
+      'Script install.sh em 1 comando + desinstalador uninstall.sh com atalho (.desktop)',
+      'Interface 3D com animações fluidas e roteamento dinâmico de modelos de IA',
+      'Painel de Uso de API por modelo acessível sincronizado em tempo real',
     ],
     steps: [
       'Extraia o pacote .tar.gz baixado',
@@ -70,14 +73,14 @@ const PLATFORMS: PlatformCardConfig[] = [
     name: 'Windows 10 / 11',
     subtitle: 'Instalador direto em janela dedicada de aplicativo',
     endpoint: '/api/downloads/windows',
-    defaultFilename: 'vertice-finance-windows-2.0.0.zip',
-    formatLabel: 'Arquivo .zip · Instalador 1-Clique (.bat)',
+    defaultFilename: 'vertice-finance-windows-2.1.0.zip',
+    formatLabel: 'Arquivo .zip · Instalador 1-Clique (.bat) v2.1.0',
     buttonLabel: 'Baixar para Windows',
     icon: Monitor,
     includes: [
-      'Instalador Instalar-Vertice-Finance.bat + desinstalador automático',
-      'Atalhos oficiais no Menu Iniciar e na Área de Trabalho com ícone .ico',
-      'Abre em janela própria dedicada com Assistente IA principal e atalhos de teclado',
+      'Instalador Instalar-Vertice-Finance.bat + desinstalador com ícones no Menu Iniciar',
+      'Interface 3D revisada com animações suaves e roteamento dinâmico de complexidade IA',
+      'Acompanhamento de Uso de API por modelo e histórico de conversas em tempo real',
     ],
     steps: [
       'Extraia o arquivo .zip baixado',
@@ -90,13 +93,13 @@ const PLATFORMS: PlatformCardConfig[] = [
     subtitle: 'Instalador nativo Kotlin + Jetpack Compose compilado via GitHub Releases',
     directDownloadUrl: ANDROID_APK_RELEASE_URL,
     defaultFilename: 'aplicativo.apk',
-    formatLabel: 'Arquivo .apk · Instalador Direto Android',
+    formatLabel: 'Arquivo .apk · Instalador Direto Android v2.1.0',
     buttonLabel: 'Baixar instalador Android (.apk)',
     icon: Smartphone,
     includes: [
-      'Download direto do arquivo aplicativo.apk pronto para instalar no celular',
-      'Assistente IA na tela inicial com histórico de conversas sincronizado no Firestore',
-      'Sempre atualizado automaticamente a cada nova versão publicada na branch main',
+      'Download direto do aplicativo.apk nativo pronto para instalar no celular',
+      'Roteamento dinâmico de complexidade IA, animações fluidas e painel de Uso de API',
+      'Atualizado automaticamente a cada nova versão publicada na branch main',
     ],
     steps: [
       'Toque em "Baixar instalador Android (.apk)" para salvar o aplicativo.apk',
@@ -172,78 +175,84 @@ export function DownloadsView() {
       {/* Header */}
       <div className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-6">
         <p className="text-xs font-mono uppercase tracking-wider text-teal-700 dark:text-teal-400">
-          Distribuições Multiplataforma · v2.0.0
+          Distribuições Multiplataforma · v2.1.0
         </p>
         <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           Baixar Vértice Finance para Linux, Windows e Android
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
           Clique no botão correspondente ao seu sistema para baixar o instalador pronto. Todas as
-          distribuições abrem com o Assistente IA como painel principal e sincronizam em tempo real
-          suas contas, lançamentos e histórico de conversas.
+          distribuições abrem com o Assistente IA como painel principal, roteamento dinâmico de
+          modelos e acompanhamento do uso de API sincronizado em tempo real.
         </p>
       </div>
 
       {/* Platform Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {PLATFORMS.map((platform) => {
+        {PLATFORMS.map((platform, idx) => {
           const Icon = platform.icon;
           const isDetected = detectedPlatform === platform.id;
           const isBusy = downloadingId === platform.id;
 
           return (
-            <article
+            <DepthCard
               key={platform.id}
-              className={`rounded-xl border bg-white dark:bg-slate-900 p-6 flex flex-col justify-between gap-6 transition-colors ${
+              as="article"
+              delay={idx * 0.06}
+              tiltStrength={3.5}
+              className={`h-full rounded-xl border bg-white dark:bg-slate-900 p-6 transition-colors ${
                 isDetected
                   ? 'border-teal-700 dark:border-teal-500'
                   : 'border-slate-200 dark:border-slate-800'
               }`}
             >
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-700/20 dark:border-teal-500/30 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5" />
+              <div className="flex flex-col justify-between gap-6 h-full">
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-700/20 dark:border-teal-500/30 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    {isDetected && (
+                      <span className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                        Detectado neste dispositivo
+                      </span>
+                    )}
                   </div>
-                  {isDetected && (
-                    <span className="text-xs font-medium text-teal-700 dark:text-teal-400">
-                      Detectado neste dispositivo
-                    </span>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                    {platform.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{platform.subtitle}</p>
-                  <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 pt-1">
-                    {platform.formatLabel}
-                  </p>
-                </div>
+                  <div className="space-y-1">
+                    <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+                      {platform.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {platform.subtitle}
+                    </p>
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 pt-1">
+                      {platform.formatLabel}
+                    </p>
+                  </div>
 
-                <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                  {platform.includes.map((item) => (
-                    <li key={item} className="flex items-start gap-2 leading-relaxed">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Instalação rápida
-                  </p>
-                  <ol className="space-y-1 text-xs text-slate-600 dark:text-slate-400 list-decimal pl-4">
-                    {platform.steps.map((step) => (
-                      <li key={step} className="leading-relaxed">
-                        {step}
+                  <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                    {platform.includes.map((item) => (
+                      <li key={item} className="flex items-start gap-2 leading-relaxed">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
+                        <span>{item}</span>
                       </li>
                     ))}
-                  </ol>
+                  </ul>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Instalação rápida
+                    </p>
+                    <ol className="space-y-1 text-xs text-slate-600 dark:text-slate-400 list-decimal pl-4">
+                      {platform.steps.map((step) => (
+                        <li key={step} className="leading-relaxed">
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 </div>
-              </div>
 
               <div className="space-y-2.5 pt-2">
                 {platform.directDownloadUrl ? (
@@ -303,13 +312,14 @@ export function DownloadsView() {
                   </p>
                 )}
               </div>
-            </article>
+              </div>
+            </DepthCard>
           );
         })}
       </div>
 
       {/* Unified Cloud Sync Info */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="depth-panel rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-white">
             Sincronização Unificada e Controle Total por IA

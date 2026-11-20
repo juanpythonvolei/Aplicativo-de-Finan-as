@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Request } from 'express';
 import { ArchiveEntry, buildTarGzBuffer, buildZipBuffer } from './archiveBuilder.ts';
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1.0';
 const DEFAULT_PUBLIC_URL =
   'https://ais-pre-26edpev5xww65gkmoof2ex-702819737353.us-east1.run.app';
 
@@ -75,7 +75,9 @@ export function resolveAndroidApkUrl(): string {
   }
   const repoSlug = (process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO || '')
     .trim()
-    .replace(/^\/+|\/+$/g, '');
+    .replace(/^https?:\/\/github\.com\//i, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\.git$/i, '');
   if (repoSlug && !repoSlug.includes('[')) {
     return `https://github.com/${repoSlug}/releases/download/latest/aplicativo.apk`;
   }
@@ -196,6 +198,7 @@ O que o instalador faz:
 - Cria o aplicativo "Vértice Finance" no menu do sistema em janela dedicada (sem barra de abas).
 - Instala o ícone oficial em ~/.local/share/icons/.
 - Cria atalho na Área de Trabalho (quando disponível) e abre o app automaticamente.
+- Inclui a v2.1.0 completa: interface refinada com profundidade 3D e animações fluidas, roteamento inteligente de modelos IA por complexidade e painel de Uso de API por modelo.
 - Sincroniza 100% em tempo real com sua conta, finanças e histórico de conversas IA.
 
 Servidor conectado: ${appUrl}
@@ -324,6 +327,7 @@ Como instalar:\r
 O que será configurado automaticamente:\r
 - Aplicativo em janela própria (modo app dedicado sem barra de endereço).\r
 - Atalho oficial no Menu Iniciar e na Área de Trabalho com ícone do Vértice Finance.\r
+- Inclui a v2.1.0 completa: efeitos 3D e animações suaves, roteamento inteligente de IA por complexidade e painel de Uso de API por modelo.\r
 - Sincronização instantânea com sua conta, lançamentos e conversas com a IA.\r
 \r
 Servidor conectado: ${appUrl}\r
