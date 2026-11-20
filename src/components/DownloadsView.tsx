@@ -21,11 +21,22 @@ function detectUserPlatform(): PlatformId | null {
   return null;
 }
 
+const DEFAULT_GITHUB_REPO = 'juanpythonvolei/Aplicativo-de-Finan-as';
+
+const CONFIGURED_GITHUB_REPO = (import.meta.env.VITE_GITHUB_REPO || DEFAULT_GITHUB_REPO)
+  .trim()
+  .replace(/^\/+|\/+$/g, '');
+
+const ANDROID_APK_RELEASE_URL =
+  (import.meta.env.VITE_ANDROID_APK_URL || '').trim() ||
+  `https://github.com/${CONFIGURED_GITHUB_REPO}/releases/download/latest/aplicativo.apk`;
+
 interface PlatformCardConfig {
   id: PlatformId;
   name: string;
   subtitle: string;
-  endpoint: string;
+  endpoint?: string;
+  directDownloadUrl?: string;
   defaultFilename: string;
   formatLabel: string;
   buttonLabel: string;
@@ -75,21 +86,21 @@ const PLATFORMS: PlatformCardConfig[] = [
   },
   {
     id: 'android',
-    name: 'Android Nativo & App',
-    subtitle: 'Projeto Kotlin + Jetpack Compose com IA principal e APK CI',
-    endpoint: '/api/downloads/android',
-    defaultFilename: 'vertice-finance-android-2.0.0.zip',
-    formatLabel: 'Arquivo .zip · Projeto Android Completo',
-    buttonLabel: 'Baixar pacote Android',
+    name: 'Android (.apk)',
+    subtitle: 'Instalador nativo Kotlin + Jetpack Compose compilado via GitHub Releases',
+    directDownloadUrl: ANDROID_APK_RELEASE_URL,
+    defaultFilename: 'aplicativo.apk',
+    formatLabel: 'Arquivo .apk · Instalador Direto Android',
+    buttonLabel: 'Baixar instalador Android (.apk)',
     icon: Smartphone,
     includes: [
-      'App nativo Kotlin + Jetpack Compose com Assistente IA na tela inicial',
-      'Histórico de conversas IA, moeda e tema sincronizados no Firestore',
-      'Workflow GitHub Actions incluso para gerar o APK na nuvem ou via Android Studio',
+      'Download direto do arquivo aplicativo.apk pronto para instalar no celular',
+      'Assistente IA na tela inicial com histórico de conversas sincronizado no Firestore',
+      'Sempre atualizado automaticamente a cada nova versão publicada na branch main',
     ],
     steps: [
-      'Extraia o .zip e abra no Android Studio (Build > Build APK) ou suba ao GitHub Actions',
-      'Ou use o botão abaixo no celular Android para instalar o aplicativo instantaneamente',
+      'Toque em "Baixar instalador Android (.apk)" para salvar o aplicativo.apk',
+      'Abra o arquivo baixado no Android e confirme a instalação (autorize fontes desconhecidas se solicitado)',
     ],
   },
 ];
@@ -103,7 +114,7 @@ export function DownloadsView() {
   const detectedPlatform = useMemo(() => detectUserPlatform(), []);
 
   const handleDownload = async (platform: PlatformCardConfig) => {
-    if (downloadingId) return;
+    if (downloadingId || !platform.endpoint) return;
     setDownloadingId(platform.id);
     try {
       const response = await fetch(platform.endpoint);
@@ -167,7 +178,7 @@ export function DownloadsView() {
           Baixar Vértice Finance para Linux, Windows e Android
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
-          Clique no botão correspondente ao seu sistema para baixar o pacote pronto. Todas as
+          Clique no botão correspondente ao seu sistema para baixar o instalador pronto. Todas as
           distribuições abrem com o Assistente IA como painel principal e sincronizam em tempo real
           suas contas, lançamentos e histórico de conversas.
         </p>
@@ -235,24 +246,40 @@ export function DownloadsView() {
               </div>
 
               <div className="space-y-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleDownload(platform)}
-                  disabled={downloadingId !== null}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-                >
-                  {isBusy ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Preparando arquivo...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      <span>{platform.buttonLabel}</span>
-                    </>
-                  )}
-                </button>
+                {platform.directDownloadUrl ? (
+                  <a
+                    href={platform.directDownloadUrl}
+                    download={platform.defaultFilename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() =>
+                      pushToast('success', `Download iniciado: ${platform.defaultFilename}`)
+                    }
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{platform.buttonLabel}</span>
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(platform)}
+                    disabled={downloadingId !== null}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                  >
+                    {isBusy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Preparando arquivo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>{platform.buttonLabel}</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 {platform.id === 'android' && !isInstalled && (
                   <button

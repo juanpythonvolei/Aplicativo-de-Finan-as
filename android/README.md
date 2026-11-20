@@ -8,14 +8,14 @@ Este é o projeto nativo completo do **Vértice Finance** para Android, sincroni
 - **Módulos secundários**: Visão Geral, Extrato, Contas/Cartões e Metas na barra inferior ergonômica.
 - **Configurações dedicadas**: Moeda principal (`BRL`, `USD`, `EUR`) e Tema (`Claro` / `Escuro`) centralizados no menu de Configurações.
 
-## Como gerar o APK instalável
+## Automação de APK via GitHub Actions
+O workflow na raiz do repositório (`.github/workflows/release-apk.yml`) compila automaticamente este projeto nativo em todo `push` para a branch `main` (ou via execução manual `workflow_dispatch`) e publica/atualiza o arquivo `aplicativo.apk` na Release fixa `latest`:
 
-### Opção 1 — Android Studio (local)
-1. Extraia este pacote `.zip` e abra a pasta no **Android Studio (Ladybug ou superior)**.
+```
+https://github.com/juanpythonvolei/Aplicativo-de-Finan-as/releases/download/latest/aplicativo.apk
+```
+
+## Compilação local (Android Studio)
+1. Abra a pasta `android/` no **Android Studio (Ladybug ou superior)**.
 2. Aguarde a sincronização automática do Gradle.
 3. Clique em **Build > Build Bundle(s) / APK(s) > Build APK(s)** ou conecte seu celular Android via USB e clique em **Run**.
-
-### Opção 2 — GitHub Actions (na nuvem, sem instalar Android Studio)
-1. Envie os arquivos desta pasta para um repositório no GitHub.
-2. Abra a aba **Actions > Build Vertice Finance Android APK** e clique em **Run workflow**.
-3. Baixe o artefato `vertice-finance-android-debug-apk` gerado automaticamente.

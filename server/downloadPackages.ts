@@ -58,14 +58,28 @@ export function getDownloadsManifest(appUrl: string) {
       android: {
         id: 'android',
         name: 'Android',
-        filename: `vertice-finance-android-${APP_VERSION}.zip`,
-        endpoint: '/api/downloads/android',
-        format: '.zip (Projeto Nativo Kotlin + APK CI)',
+        filename: 'aplicativo.apk',
+        endpoint: resolveAndroidApkUrl(),
+        format: '.apk (Instalador Direto Android)',
         summary:
-          'Projeto nativo Android Studio (Kotlin + Jetpack Compose) com Assistente IA principal, histórico Firestore e workflow GitHub Actions para gerar APK.',
+          'Aplicativo nativo Android (.apk) compilado automaticamente via GitHub Actions com Assistente IA principal e sincronização Firestore.',
       },
     },
   };
+}
+
+export function resolveAndroidApkUrl(): string {
+  const directUrl = (process.env.VITE_ANDROID_APK_URL || process.env.ANDROID_APK_URL || '').trim();
+  if (directUrl && /^https?:\/\//i.test(directUrl)) {
+    return directUrl;
+  }
+  const repoSlug = (process.env.VITE_GITHUB_REPO || process.env.GITHUB_REPO || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '');
+  if (repoSlug && !repoSlug.includes('[')) {
+    return `https://github.com/${repoSlug}/releases/download/latest/aplicativo.apk`;
+  }
+  return 'https://github.com/juanpythonvolei/Aplicativo-de-Finan-as/releases/download/latest/aplicativo.apk';
 }
 
 export function buildLinuxPackage(rootDir: string, appUrl: string): {
@@ -333,54 +347,6 @@ Para remover: dê duplo clique em "Desinstalar-Vertice-Finance.bat".\r
 
   return {
     filename: `vertice-finance-windows-${APP_VERSION}.zip`,
-    buffer: buildZipBuffer(entries),
-    contentType: 'application/zip',
-  };
-}
-
-function walkDirectory(dir: string, baseDir: string, out: ArchiveEntry[], appUrl: string) {
-  const skipDirs = new Set(['.gradle', 'build', '.idea', 'node_modules']);
-  const items = fs.readdirSync(dir, { withFileTypes: true });
-  for (const item of items) {
-    if (skipDirs.has(item.name)) continue;
-    const fullPath = path.join(dir, item.name);
-    if (item.isDirectory()) {
-      walkDirectory(fullPath, baseDir, out, appUrl);
-    } else if (item.isFile()) {
-      const rel = path.relative(baseDir, fullPath).replace(/\\/g, '/');
-      let content: Buffer | string = fs.readFileSync(fullPath);
-      if (rel === 'app/src/main/res/values/strings.xml') {
-        const xml = content
-          .toString('utf8')
-          .replace(
-            /<string name="api_base_url">[^<]*<\/string>/,
-            `<string name="api_base_url">${appUrl}</string>`
-          );
-        content = xml;
-      }
-      const stat = fs.statSync(fullPath);
-      out.push({
-        path: `vertice-finance-android/${rel}`,
-        content,
-        mode: rel.endsWith('gradlew') ? 0o755 : stat.mode & 0o777,
-        mtime: stat.mtime,
-      });
-    }
-  }
-}
-
-export function buildAndroidPackage(rootDir: string, appUrl: string): {
-  filename: string;
-  buffer: Buffer;
-  contentType: string;
-} {
-  const androidDir = path.join(rootDir, 'android');
-  const entries: ArchiveEntry[] = [];
-  if (fs.existsSync(androidDir)) {
-    walkDirectory(androidDir, androidDir, entries, appUrl);
-  }
-  return {
-    filename: `vertice-finance-android-${APP_VERSION}.zip`,
     buffer: buildZipBuffer(entries),
     contentType: 'application/zip',
   };

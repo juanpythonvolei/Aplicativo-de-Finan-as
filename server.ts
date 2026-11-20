@@ -18,7 +18,6 @@ import {
 } from './shared/aiProfiles.ts';
 import { collectDatabaseStats } from './server/adminDatabaseStats.ts';
 import {
-  buildAndroidPackage,
   buildLinuxPackage,
   buildWindowsPackage,
   getDownloadsManifest,
@@ -233,21 +232,6 @@ async function startServer() {
     } catch (err) {
       console.error('Erro ao gerar pacote Windows:', err);
       res.status(500).json({ error: 'Não foi possível gerar o instalador Windows.' });
-    }
-  });
-
-  app.get('/api/downloads/android', (req, res) => {
-    try {
-      const appUrl = resolvePublicAppUrl(req);
-      const pkg = buildAndroidPackage(__dirname, appUrl);
-      res.setHeader('Content-Type', pkg.contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${pkg.filename}"`);
-      res.setHeader('Content-Length', String(pkg.buffer.length));
-      res.setHeader('Cache-Control', 'no-store');
-      res.send(pkg.buffer);
-    } catch (err) {
-      console.error('Erro ao gerar pacote Android:', err);
-      res.status(500).json({ error: 'Não foi possível gerar o pacote Android.' });
     }
   });
 

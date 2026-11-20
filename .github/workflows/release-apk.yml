@@ -1,0 +1,89 @@
+name: Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release-apk:
+    name: Compilar e Publicar APK (latest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Nota: este projeto usa Android nativo (Kotlin + Jetpack Compose) em ./android,
+      # sem Capacitor, portanto não requer etapa de build web ou `npx cap sync android`.
+      - name: Configurar Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar Android SDK Platform 35 e Build Tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Garantir gradlew executável e compilar APK Debug
+        working-directory: android
+        run: |
+          if [ ! -f ./gradlew ]; then
+            gradle wrapper --gradle-version 8.10.2
+          fi
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Preparar aplicativo.apk para publicação
+        run: |
+          APK_SOURCE="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_SOURCE" ]; then
+            echo "Erro: APK não encontrado em $APK_SOURCE"
+            exit 1
+          fi
+          mkdir -p dist-apk
+          cp "$APK_SOURCE" dist-apk/aplicativo.apk
+          ls -lh dist-apk/aplicativo.apk
+
+      - name: Atualizar tag fixa latest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push -f origin refs/tags/latest
+
+      - name: Publicar/Atualizar GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Vértice Finance Android (Última Versão)
+          body: |
+            Compilação automática do instalador Android (`aplicativo.apk`) gerada a partir da branch `main`.
+
+            - **Commit:** `${{ github.sha }}`
+            - **Download direto:** `https://github.com/${{ github.repository }}/releases/download/latest/aplicativo.apk`
+          files: dist-apk/aplicativo.apk
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          make_latest: true
