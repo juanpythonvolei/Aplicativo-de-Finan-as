@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="firebase_project_id" translatable="false">projeto-de-ja</string>
+    <string name="firebase_app_id" translatable="false">1:149311896515:web:9f186790e0f9beab215b76</string>
+    <string name="firebase_api_key" translatable="false">AIzaSyDZVFQltKTF0nOSxYP1ctIIG18QQmu7pZg</string>
+    <string name="firebase_auth_domain" translatable="false">projeto-de-ja.firebaseapp.com</string>
+    <string name="firebase_storage_bucket" translatable="false">projeto-de-ja.firebasestorage.app</string>
+    <string name="firebase_messaging_sender_id" translatable="false">149311896515</string>
+    <string name="firebase_database_id" translatable="false">ai-studio-05d8f155-f145-495f-b648-b83217284450</string>
+    <string name="default_web_client_id" translatable="false">149311896515-afkrpvi06mc42derask0trc68keiun7a.apps.googleusercontent.com</string>
+</resources>

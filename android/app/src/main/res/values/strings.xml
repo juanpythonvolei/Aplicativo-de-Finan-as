@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vértice Finance</string>
+    <string name="api_base_url">https://ais-pre-26edpev5xww65gkmoof2ex-702819737353.us-east1.run.app</string>
+</resources>

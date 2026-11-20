@@ -1,0 +1,8 @@
+{
+  "name": "Vértice Finance",
+  "description": "Controle financeiro pessoal completo com fluxo de caixa, contas, cartões de crédito, orçamentos mensais, metas e relatórios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

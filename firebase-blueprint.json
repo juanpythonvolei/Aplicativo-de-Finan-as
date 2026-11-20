@@ -1,0 +1,552 @@
+{
+  "entities": {
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Root financial workspace settings for an authenticated user without PII.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the workspace owner."
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["BRL", "USD", "EUR"],
+          "description": "Primary display currency code."
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark"],
+          "description": "Preferred UI color theme."
+        },
+        "seededSample": {
+          "type": "boolean",
+          "description": "Whether the user has already initialized or dismissed sample data."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of workspace creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last workspace update."
+        }
+      },
+      "required": ["userId", "currency", "theme", "seededSample", "createdAt", "updatedAt"]
+    },
+    "UserPrivateProfile": {
+      "title": "UserPrivateProfile",
+      "description": "Isolated PII profile data accessible only to the owning user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "email", "displayName", "photoURL", "createdAt", "updatedAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Financial account such as checking, savings, cash wallet, investment, or credit card.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "type": {
+          "type": "string",
+          "enum": ["checking", "savings", "wallet", "investment", "credit"]
+        },
+        "institution": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "balance": {
+          "type": "number"
+        },
+        "creditLimit": {
+          "type": "number"
+        },
+        "closingDay": {
+          "type": "number"
+        },
+        "dueDay": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "type",
+        "institution",
+        "balance",
+        "creditLimit",
+        "closingDay",
+        "dueDay",
+        "color",
+        "archived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Income or expense category used to classify transactions and budgets.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "type": {
+          "type": "string",
+          "enum": ["income", "expense"]
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "color": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "name", "type", "icon", "color", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Income, expense, or internal account transfer entry.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["income", "expense", "transfer"]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "categoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "accountId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "toAccountId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["paid", "pending"]
+        },
+        "isRecurring": {
+          "type": "boolean"
+        },
+        "recurrenceFrequency": {
+          "type": "string",
+          "enum": ["none", "monthly", "weekly", "yearly"]
+        },
+        "installmentGroupId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "installmentNumber": {
+          "type": "number"
+        },
+        "installmentTotal": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "type",
+        "amount",
+        "description",
+        "categoryId",
+        "accountId",
+        "toAccountId",
+        "date",
+        "status",
+        "isRecurring",
+        "recurrenceFrequency",
+        "installmentGroupId",
+        "installmentNumber",
+        "installmentTotal",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Monthly spending ceiling for a specific expense category.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "month": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "categoryId", "month", "amount", "createdAt", "updatedAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Savings or financial objective with progress tracking.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "targetAmount": {
+          "type": "number"
+        },
+        "currentAmount": {
+          "type": "number"
+        },
+        "deadline": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "color": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "cancelled"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "targetAmount",
+        "currentAmount",
+        "deadline",
+        "color",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AssistantConfig": {
+      "title": "AssistantConfig",
+      "description": "Global AI assistant model and cost-efficiency configuration managed exclusively by the administrator.",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "enum": ["economic_smart", "ultra_lite", "balanced", "deep"]
+        },
+        "modelId": {
+          "type": "string",
+          "enum": ["gemini-4-hydrogen", "gemini-3.1-flash-lite"]
+        },
+        "thinkingLevel": {
+          "type": "string",
+          "enum": ["LOW", "MEDIUM", "HIGH", "MINIMAL"]
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["profileId", "modelId", "thinkingLevel", "updatedBy", "updatedAt"]
+    },
+    "AIConversation": {
+      "title": "AIConversation",
+      "description": "Persisted AI assistant conversation session owned by a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "preview": {
+          "type": "string",
+          "maxLength": 220
+        },
+        "messageCount": {
+          "type": "number"
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "title", "preview", "messageCount", "lastMessageAt", "createdAt", "updatedAt"]
+    },
+    "AIConversationMessage": {
+      "title": "AIConversationMessage",
+      "description": "Individual message inside a persisted AI conversation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "conversationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "actionsSummary": {
+          "type": "array",
+          "maxItems": 25,
+          "items": {
+            "type": "string",
+            "maxLength": 240
+          }
+        },
+        "modelProfileId": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "hasImage": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "conversationId",
+        "role",
+        "text",
+        "actionsSummary",
+        "modelProfileId",
+        "hasImage",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/appConfig/{configId}": {
+      "schema": { "$ref": "#/entities/AssistantConfig" },
+      "description": "Global application configuration documents managed by administrator."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "User workspace preferences and metadata."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateProfile" },
+      "description": "Isolated user PII profile document."
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/Account" },
+      "description": "User bank accounts, wallets, investments, and credit cards."
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "User income and expense categories."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "User financial ledger transactions."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/Budget" },
+      "description": "Monthly category budgets."
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": { "$ref": "#/entities/Goal" },
+      "description": "User financial goals."
+    },
+    "/users/{userId}/aiConversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/AIConversation" },
+      "description": "Persisted AI assistant conversation headers."
+    },
+    "/users/{userId}/aiConversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/AIConversationMessage" },
+      "description": "Persisted messages within an AI assistant conversation."
+    }
+  }
+}
