@@ -27,7 +27,7 @@ jobs:
       # Nota: este projeto usa Android nativo (Kotlin + Jetpack Compose) em ./android,
       # sem Capacitor, portanto não requer etapa de build web ou `npx cap sync android`.
       - name: Configurar Java 17 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'

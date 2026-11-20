@@ -54,7 +54,9 @@ class AssistantClient(private val baseUrl: String) {
 
         val status = conn.responseCode
         val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-        val body = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+        val body = stream?.let {
+            BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { reader -> reader.readText() }
+        } ?: ""
         conn.disconnect()
 
         val json = runCatching { JSONObject(body) }.getOrNull()
