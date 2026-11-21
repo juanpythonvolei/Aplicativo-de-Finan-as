@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { AccountSecurityModal } from './components/AccountSecurityModal';
 import { AccountsView } from './components/AccountsView';
+import { AndroidAuthBridge } from './components/AndroidAuthBridge';
 import { AssistantMainView } from './components/AssistantMainView';
 import { AuthScreen } from './components/AuthScreen';
 import { BudgetsView } from './components/BudgetsView';
@@ -36,8 +37,16 @@ import {
 } from './types/finance';
 
 function AppShell() {
-  const { user, authLoading, needsEmailVerification, accounts, transactions, toasts, dismissToast } =
-    useFinance();
+  const {
+    user,
+    authLoading,
+    needsEmailVerification,
+    biometricLocked,
+    accounts,
+    transactions,
+    toasts,
+    dismissToast,
+  } = useFinance();
   // AI Assistant is the primary landing panel across Web, Linux, Windows, and Android
   const [activeTab, setActiveTab] = useState<ViewTab>('assistant');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -191,7 +200,7 @@ function AppShell() {
     );
   }
 
-  if (!user) {
+  if (!user || biometricLocked) {
     return <AuthScreen />;
   }
 
@@ -353,6 +362,18 @@ function AppShell() {
 }
 
 export default function App() {
+  const isAndroidAuthBridge =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('androidAuth') === '1';
+
+  if (isAndroidAuthBridge) {
+    return (
+      <ErrorBoundary>
+        <AndroidAuthBridge />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <FinanceProvider>

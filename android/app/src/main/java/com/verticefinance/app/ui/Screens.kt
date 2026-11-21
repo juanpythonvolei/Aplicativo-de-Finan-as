@@ -6,8 +6,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -17,20 +19,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.verticefinance.app.data.AccountDoc
 import com.verticefinance.app.data.Formatters
 import com.verticefinance.app.data.TransactionDoc
 import kotlin.math.max
 
 @Composable
-fun AuthScreen(onGoogleSignIn: () -> Unit, errorMessage: String?) {
+fun AuthScreen(
+    biometricLocked: Boolean,
+    showBiometricButton: Boolean,
+    recognizedAccountLabel: String,
+    onBiometricSignIn: () -> Unit,
+    onSwitchAccount: () -> Unit,
+    onGoogleSignIn: () -> Unit,
+    onWebGoogleSignIn: () -> Unit,
+    onEmailSignIn: (String, String) -> Unit,
+    onEmailSignUp: (String, String, String) -> Unit,
+    onContinueLocal: () -> Unit,
+    errorMessage: String?
+) {
+    var showEmailForm by remember { mutableStateOf(false) }
+    var isSignUp by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 36.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
@@ -41,27 +64,253 @@ fun AuthScreen(onGoogleSignIn: () -> Unit, errorMessage: String?) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Controle financeiro pessoal sincronizado em tempo real com sua conta web.",
-                style = MaterialTheme.typography.bodyLarge,
+                text = if (biometricLocked) {
+                    "Cofre local protegido por biometria. Confirme sua identidade para acessar seus dados financeiros."
+                } else {
+                    "Armazenamento local prioritário com sincronização segura na nuvem Google entre Android, Web, Linux e Windows."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(28.dp))
-            Button(
-                onClick = onGoogleSignIn,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Entrar com Google", fontWeight = FontWeight.SemiBold)
+
+            Spacer(Modifier.height(24.dp))
+
+            if (biometricLocked) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Fingerprint,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(34.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Acesso Biométrico",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (recognizedAccountLabel.isNotBlank()) {
+                                    Text(
+                                        text = recognizedAccountLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = onBiometricSignIn,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Desbloquear com Biometria", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        TextButton(
+                            onClick = onSwitchAccount,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Usar outra conta ou senha")
+                        }
+                    }
+                }
+            } else {
+                if (showBiometricButton) {
+                    Button(
+                        onClick = onBiometricSignIn,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Entrar com Biometria (Face ID / Digital)", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (recognizedAccountLabel.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Acesso rápido ao cofre local: $recognizedAccountLabel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // Primary Google Sign-In (native picker with automatic browser fallback)
+                Button(
+                    onClick = onGoogleSignIn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Outlined.CloudDone, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Entrar com Google", fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // Direct Browser Google Auth Bridge (guaranteed SHA-1-free login)
+                OutlinedButton(
+                    onClick = onWebGoogleSignIn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Entrar com Google pelo navegador", fontWeight = FontWeight.Medium)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // Local-First Offline Mode
+                FilledTonalButton(
+                    onClick = onContinueLocal,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Outlined.PhoneAndroid, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Usar no Modo Local (Offline)", fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Seus dados ficam salvos no aparelho e podem ser sincronizados com sua conta Google a qualquer momento.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = { showEmailForm = !showEmailForm },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (showEmailForm) "Ocultar login com E-mail e Senha" else "Entrar ou criar conta com E-mail e Senha",
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (showEmailForm) {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = !isSignUp,
+                                    onClick = { isSignUp = false },
+                                    label = { Text("Entrar") }
+                                )
+                                FilterChip(
+                                    selected = isSignUp,
+                                    onClick = { isSignUp = true },
+                                    label = { Text("Criar conta") }
+                                )
+                            }
+
+                            if (isSignUp) {
+                                OutlinedTextField(
+                                    value = name,
+                                    onValueChange = { name = it },
+                                    label = { Text("Nome completo") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = { Text("E-mail") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text("Senha") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (isSignUp) {
+                                        onEmailSignUp(name, email, password)
+                                    } else {
+                                        onEmailSignIn(email, password)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(if (isSignUp) "Criar conta com E-mail" else "Entrar com E-mail")
+                            }
+                        }
+                    }
+                }
             }
+
             if (!errorMessage.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    text = errorMessage,
-                    color = CrimsonNegative,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, CrimsonNegative),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = CrimsonNegative,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
         }
     }

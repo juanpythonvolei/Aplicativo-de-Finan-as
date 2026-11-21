@@ -1,7 +1,7 @@
 package com.verticefinance.app
 
+import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
@@ -18,15 +18,45 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.fragment.app.FragmentActivity
+import com.verticefinance.app.data.BiometricAuthHelper
 import com.verticefinance.app.data.Formatters
 import com.verticefinance.app.ui.*
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val viewModel: FinanceViewModel by viewModels()
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "verticefinance" && data.host == "auth-callback") {
+            viewModel.handleAuthCallbackUri(data)
+        }
+    }
+
+    private fun promptBiometricUnlock(
+        title: String = "Desbloquear Vértice Finance",
+        subtitle: String = "Use Face ID, impressão digital ou credencial do dispositivo"
+    ) {
+        BiometricAuthHelper.authenticate(
+            activity = this,
+            title = title,
+            subtitle = subtitle,
+            onSuccess = { viewModel.onBiometricUnlockSuccess() },
+            onError = { err -> viewModel.showBiometricError(err) }
+        )
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIncomingIntent(intent)
+
         setContent {
             val state by viewModel.uiState.collectAsState()
             VerticeFinanceTheme(darkTheme = state.theme == "dark") {
@@ -39,17 +69,39 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Automatically trigger native biometric prompt once when opening a locked vault
+                var autoPrompted by remember(state.biometricLocked) { mutableStateOf(false) }
+                LaunchedEffect(state.loading, state.biometricLocked, state.biometricAvailable) {
+                    if (!state.loading && state.biometricLocked && state.biometricAvailable && !autoPrompted) {
+                        autoPrompted = true
+                        promptBiometricUnlock()
+                    }
+                }
+
                 if (state.loading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (state.user == null) {
+                } else if ((state.user == null && !state.isLocalMode) || state.biometricLocked) {
+                    val showBiometricOption = state.biometricAvailable &&
+                        (state.biometricLocked || state.biometricEnabled || state.hasLocalVaultData)
                     AuthScreen(
+                        biometricLocked = state.biometricLocked,
+                        showBiometricButton = showBiometricOption,
+                        recognizedAccountLabel = state.lastKnownEmail.ifBlank {
+                            if (state.hasLocalVaultData) "Cofre Local no aparelho" else ""
+                        },
+                        onBiometricSignIn = { promptBiometricUnlock() },
+                        onSwitchAccount = { viewModel.signOut() },
                         onGoogleSignIn = { viewModel.signInWithGoogle(this@MainActivity) },
+                        onWebGoogleSignIn = { viewModel.launchWebGoogleSignIn(this@MainActivity) },
+                        onEmailSignIn = { email, pass -> viewModel.signInWithEmail(email, pass) },
+                        onEmailSignUp = { name, email, pass -> viewModel.signUpWithEmail(name, email, pass) },
+                        onContinueLocal = { viewModel.enterLocalMode() },
                         errorMessage = state.message
                     )
                 } else {
-                    var currentTab by remember { mutableIntStateOf(0) }
+                    var currentTab by remember { mutableIntStateOf(if (state.isLocalMode) 1 else 0) }
                     var showNewTx by remember { mutableStateOf(false) }
                     var showSettings by remember { mutableStateOf(false) }
 
@@ -71,8 +123,13 @@ class MainActivity : ComponentActivity() {
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold
                                         )
+                                        val subtitle = buildString {
+                                            append(Formatters.formatMonthLabel(state.selectedMonth))
+                                            append(" · ")
+                                            append(if (state.isLocalMode) "Local (Offline)" else "Local + Nuvem")
+                                        }
                                         Text(
-                                            text = Formatters.formatMonthLabel(state.selectedMonth),
+                                            text = subtitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -87,7 +144,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                     IconButton(onClick = {
                                         showSettings = true
-                                        viewModel.refreshApiUsage()
+                                        if (state.user != null) {
+                                            viewModel.refreshApiUsage()
+                                        }
                                     }) {
                                         Icon(Icons.Outlined.Settings, contentDescription = "Configurações")
                                     }
@@ -158,7 +217,8 @@ class MainActivity : ComponentActivity() {
                                         onNewConversation = { viewModel.startNewConversation() },
                                         onSelectConversation = { viewModel.selectConversation(it) },
                                         onDeleteConversation = { viewModel.deleteConversation(it) },
-                                        onOpenDashboard = { currentTab = 1 }
+                                        onOpenDashboard = { currentTab = 1 },
+                                        onConnectGoogle = { viewModel.launchWebGoogleSignIn(this@MainActivity) }
                                     )
                                     1 -> DashboardScreen(
                                         state = state,
@@ -205,9 +265,38 @@ class MainActivity : ComponentActivity() {
                             currency = state.currency,
                             theme = state.theme,
                             userEmail = state.user?.email ?: "",
+                            isLocalMode = state.isLocalMode,
+                            biometricAvailable = state.biometricAvailable,
+                            biometricEnabled = state.biometricEnabled,
+                            syncing = state.syncing,
+                            lastSyncedAtMillis = state.lastSyncedAtMillis,
+                            hasPendingLocalSync = state.hasPendingLocalSync,
+                            localSummary = "${state.accounts.size} conta(s) · ${state.transactions.size} lançamento(s) · ${state.goals.size} meta(s)",
                             apiUsage = state.apiUsage,
                             apiUsageLoading = state.apiUsageLoading,
                             onRefreshApiUsage = { viewModel.refreshApiUsage() },
+                            onSyncNow = { viewModel.syncNow() },
+                            onConnectGoogle = {
+                                showSettings = false
+                                viewModel.launchWebGoogleSignIn(this@MainActivity)
+                            },
+                            onToggleBiometric = { enable ->
+                                if (enable) {
+                                    BiometricAuthHelper.authenticate(
+                                        activity = this@MainActivity,
+                                        title = "Ativar Biometria",
+                                        subtitle = "Confirme sua digital ou rosto para proteger o cofre local",
+                                        onSuccess = { viewModel.setBiometricEnabled(true) },
+                                        onError = { err -> viewModel.showBiometricError(err) }
+                                    )
+                                } else {
+                                    viewModel.setBiometricEnabled(false)
+                                }
+                            },
+                            onLockNow = {
+                                showSettings = false
+                                viewModel.lockWithBiometric()
+                            },
                             onSelectCurrency = { viewModel.setCurrency(it) },
                             onSelectTheme = { viewModel.setTheme(it) },
                             onSignOut = { viewModel.signOut() },

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -41,6 +42,15 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { mapFirebaseAuthError } from '../lib/authErrors';
+import {
+  BiometricProfile,
+  authenticateWithBiometric,
+  clearBiometricProfile,
+  enrollBiometricForUser,
+  isBiometricHardwareAvailable,
+  loadBiometricProfile,
+  mapBiometricError,
+} from '../lib/biometricAuth';
 import {
   OperationType,
   getFriendlyErrorMessage,
@@ -164,6 +174,14 @@ interface FinanceContextValue {
   linkGoogleToAccount: () => Promise<void>;
   logout: () => Promise<void>;
   loadSampleData: () => Promise<void>;
+  // Biometric Authentication (WebAuthn Platform Authenticator + Local Storage)
+  biometricAvailable: boolean;
+  biometricProfile: BiometricProfile | null;
+  biometricLocked: boolean;
+  enrollBiometric: () => Promise<void>;
+  disableBiometric: () => void;
+  unlockWithBiometric: () => Promise<boolean>;
+  lockWithBiometric: () => void;
   isAdmin: boolean;
   assistantProfileId: AIProfileId;
   updateAssistantProfile: (profileId: AIProfileId) => Promise<void>;
@@ -251,6 +269,22 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [assistantProfileId, setAssistantProfileId] = useState<AIProfileId>(DEFAULT_AI_PROFILE_ID);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false);
+  const [biometricProfile, setBiometricProfile] = useState<BiometricProfile | null>(() =>
+    loadBiometricProfile()
+  );
+  const [biometricLocked, setBiometricLocked] = useState<boolean>(false);
+  const freshInteractiveSignInRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    isBiometricHardwareAvailable().then((ok) => {
+      if (active) setBiometricAvailable(ok);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const setActiveConversationId = useCallback((conversationId: string | null) => {
     setUserClearedConversation(conversationId === null);
@@ -340,6 +374,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       if (!firebaseUser) {
         setNeedsEmailVerification(false);
+        setBiometricLocked(false);
         setWorkspace(null);
         setProfile(null);
         setAccounts([]);
@@ -357,10 +392,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       if (!firebaseUser.emailVerified) {
         setNeedsEmailVerification(true);
+        setBiometricLocked(false);
         setDataLoading(false);
         setAuthLoading(false);
         return;
       }
+
+      const savedBio = loadBiometricProfile();
+      setBiometricProfile(savedBio);
+      const shouldLock =
+        !freshInteractiveSignInRef.current &&
+        Boolean(savedBio?.enabled && savedBio.uid === firebaseUser.uid);
+      freshInteractiveSignInRef.current = false;
+      setBiometricLocked(shouldLock);
 
       setNeedsEmailVerification(false);
       setDataLoading(true);
@@ -580,20 +624,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [user, workspaceReady, needsEmailVerification, activeConversationId]);
 
   const signInWithGoogle = useCallback(async (rememberMe = true) => {
+    freshInteractiveSignInRef.current = true;
     await setPersistence(
       auth,
       rememberMe ? browserLocalPersistence : browserSessionPersistence
     );
     await signInWithPopup(auth, googleProvider);
+    setBiometricLocked(false);
   }, []);
 
   const signInWithEmail = useCallback(
     async (email: string, password: string, rememberMe = true) => {
+      freshInteractiveSignInRef.current = true;
       await setPersistence(
         auth,
         rememberMe ? browserLocalPersistence : browserSessionPersistence
       );
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      setBiometricLocked(false);
     },
     []
   );
@@ -714,8 +762,64 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [pushToast]);
 
   const logout = useCallback(async () => {
+    setBiometricLocked(false);
     await signOut(auth);
   }, []);
+
+  const enrollBiometric = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new Error('Faça login para ativar o desbloqueio biométrico.');
+    }
+    const isGoogle = current.providerData.some((p) => p.providerId === 'google.com');
+    try {
+      const enrolled = await enrollBiometricForUser({
+        uid: current.uid,
+        email: current.email || '',
+        displayName: profile?.displayName || current.displayName || current.email || 'Usuário',
+        provider: isGoogle ? 'google' : 'password',
+      });
+      setBiometricProfile(enrolled);
+      setBiometricLocked(false);
+      pushToast('success', 'Autenticação biométrica ativada neste dispositivo.');
+    } catch (err) {
+      throw new Error(mapBiometricError(err));
+    }
+  }, [profile, pushToast]);
+
+  const disableBiometric = useCallback(() => {
+    clearBiometricProfile();
+    setBiometricProfile(null);
+    setBiometricLocked(false);
+    pushToast('info', 'Autenticação biométrica desativada neste dispositivo.');
+  }, [pushToast]);
+
+  const unlockWithBiometric = useCallback(async (): Promise<boolean> => {
+    const saved = loadBiometricProfile();
+    if (!saved) {
+      throw new Error('Nenhuma credencial biométrica registrada neste dispositivo.');
+    }
+    try {
+      const verified = await authenticateWithBiometric(saved);
+      if (verified) {
+        setBiometricProfile(loadBiometricProfile());
+        setBiometricLocked(false);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      throw new Error(mapBiometricError(err));
+    }
+  }, []);
+
+  const lockWithBiometric = useCallback(() => {
+    const saved = loadBiometricProfile();
+    if (!saved?.enabled || !auth.currentUser || saved.uid !== auth.currentUser.uid) {
+      pushToast('info', 'Ative a biometria em Segurança antes de bloquear o cofre.');
+      return;
+    }
+    setBiometricLocked(true);
+  }, [pushToast]);
 
   const toggleTheme = useCallback(async () => {
     const next: ThemeMode = theme === 'light' ? 'dark' : 'light';
@@ -1701,6 +1805,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       linkGoogleToAccount,
       logout,
       loadSampleData,
+      biometricAvailable,
+      biometricProfile,
+      biometricLocked,
+      enrollBiometric,
+      disableBiometric,
+      unlockWithBiometric,
+      lockWithBiometric,
       isAdmin,
       assistantProfileId,
       updateAssistantProfile,
@@ -1767,6 +1878,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       linkGoogleToAccount,
       logout,
       loadSampleData,
+      biometricAvailable,
+      biometricProfile,
+      biometricLocked,
+      enrollBiometric,
+      disableBiometric,
+      unlockWithBiometric,
+      lockWithBiometric,
       isAdmin,
       assistantProfileId,
       updateAssistantProfile,

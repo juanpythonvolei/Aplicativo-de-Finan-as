@@ -5,9 +5,14 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.PersistentCacheSettings
 import com.verticefinance.app.R
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +42,55 @@ class FinanceRepository(context: Context) {
         auth = FirebaseAuth.getInstance(app)
         val databaseId = context.getString(R.string.firebase_database_id)
         db = FirebaseFirestore.getInstance(app, databaseId)
+
+        // Explicit 100 MB persistent local disk cache for offline-first Firestore reads & queued writes
+        runCatching {
+            val settings = FirebaseFirestoreSettings.Builder()
+                .setLocalCacheSettings(
+                    PersistentCacheSettings.newBuilder()
+                        .setSizeBytes(100L * 1024L * 1024L)
+                        .build()
+                )
+                .build()
+            db.firestoreSettings = settings
+        }
+    }
+
+    suspend fun signInWithGoogleTokens(idToken: String?, accessToken: String?): FirebaseUser? {
+        val safeId = idToken?.trim()?.ifBlank { null }
+        val safeAccess = accessToken?.trim()?.ifBlank { null }
+        if (safeId == null && safeAccess == null) {
+            throw IllegalArgumentException("Credencial Google ausente.")
+        }
+        val credential = GoogleAuthProvider.getCredential(safeId, safeAccess)
+        return auth.signInWithCredential(credential).await().user
+    }
+
+    suspend fun signInWithEmail(email: String, password: String): FirebaseUser? {
+        val result = auth.signInWithEmailAndPassword(email.trim(), password).await()
+        return result.user
+    }
+
+    suspend fun signUpWithEmail(name: String, email: String, password: String): FirebaseUser? {
+        val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
+        val user = result.user
+        if (user != null) {
+            val cleanName = name.trim().take(120)
+            if (cleanName.isNotEmpty()) {
+                runCatching {
+                    val req = UserProfileChangeRequest.Builder()
+                        .setDisplayName(cleanName)
+                        .build()
+                    user.updateProfile(req).await()
+                }
+            }
+            runCatching { user.sendEmailVerification().await() }
+        }
+        return user
+    }
+
+    suspend fun waitForCloudSync() {
+        db.waitForPendingWrites().await()
     }
 
     suspend fun ensureWorkspaceInitialized(user: FirebaseUser) {
@@ -98,6 +152,197 @@ class FinanceRepository(context: Context) {
             }
             batch.commit().await()
         }
+    }
+
+    private fun sanitizeId(raw: String, fallbackPrefix: String): String {
+        val cleaned = raw.replace(Regex("[^a-zA-Z0-9_\\-]"), "").take(120)
+        return cleaned.ifBlank { Formatters.safeId(fallbackPrefix) }
+    }
+
+    private fun sanitizeHexColor(raw: String, fallback: String = "#0F766E"): String {
+        return if (Regex("^#[0-9a-fA-F]{6}$").matches(raw)) raw else fallback
+    }
+
+    private fun sanitizeIsoDate(raw: String): String {
+        return if (Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(raw)) raw else Formatters.todayIso()
+    }
+
+    private fun sanitizeMonth(raw: String): String {
+        return if (Regex("^\\d{4}-\\d{2}$").matches(raw)) raw else Formatters.currentMonthKey()
+    }
+
+    private suspend fun commitWriteChunks(writes: List<Pair<DocumentReference, Map<String, Any>>>) {
+        if (writes.isEmpty()) return
+        for (chunk in writes.chunked(350)) {
+            val batch = db.batch()
+            for ((ref, payload) in chunk) {
+                batch.set(ref, payload)
+            }
+            batch.commit().await()
+        }
+    }
+
+    /**
+     * Merges local-first records created offline into the authenticated user's Firestore workspace.
+     * Skips IDs that already exist in cloud and strictly satisfies firestore.rules schemas.
+     */
+    suspend fun uploadLocalVaultToCloud(user: FirebaseUser, snapshot: LocalVaultSnapshot): Int {
+        ensureWorkspaceInitialized(user)
+        val uid = user.uid
+        val userRef = db.collection("users").document(uid)
+        val now = FieldValue.serverTimestamp()
+
+        val existingAccountIds = userRef.collection("accounts")
+            .whereEqualTo("userId", uid).get().await().documents.map { it.id }.toMutableSet()
+        val existingCategoryIds = userRef.collection("categories")
+            .whereEqualTo("userId", uid).get().await().documents.map { it.id }.toMutableSet()
+        val existingTxIds = userRef.collection("transactions")
+            .whereEqualTo("userId", uid).get().await().documents.map { it.id }.toSet()
+        val existingBudgetIds = userRef.collection("budgets")
+            .whereEqualTo("userId", uid).get().await().documents.map { it.id }.toSet()
+        val existingGoalIds = userRef.collection("goals")
+            .whereEqualTo("userId", uid).get().await().documents.map { it.id }.toSet()
+
+        // Phase 1: Accounts, Categories, and Goals (must exist before dependent transactions/budgets)
+        val phase1Writes = mutableListOf<Pair<DocumentReference, Map<String, Any>>>()
+        val accountIdMap = mutableMapOf<String, String>()
+        val categoryIdMap = mutableMapOf<String, String>()
+
+        for (acc in snapshot.accounts) {
+            val safeId = sanitizeId(acc.id, "acc")
+            accountIdMap[acc.id] = safeId
+            if (safeId in existingAccountIds) continue
+            val safeName = acc.name.trim().ifBlank { "Conta Local" }.take(80)
+            val safeType = if (acc.type in listOf("checking", "savings", "wallet", "investment", "credit")) {
+                acc.type
+            } else "checking"
+            phase1Writes += userRef.collection("accounts").document(safeId) to mapOf(
+                "userId" to uid,
+                "name" to safeName,
+                "type" to safeType,
+                "institution" to acc.institution.trim().take(80),
+                "balance" to ((acc.balance * 100.0).roundToLong() / 100.0),
+                "creditLimit" to if (safeType == "credit") acc.creditLimit.coerceAtLeast(0.0) else 0.0,
+                "closingDay" to if (safeType == "credit") acc.closingDay.coerceIn(0, 31) else 0,
+                "dueDay" to if (safeType == "credit") acc.dueDay.coerceIn(0, 31) else 0,
+                "color" to sanitizeHexColor(acc.color, if (safeType == "credit") "#1E293B" else "#0F766E"),
+                "archived" to acc.archived,
+                "createdAt" to now,
+                "updatedAt" to now
+            )
+            existingAccountIds += safeId
+        }
+
+        for (cat in snapshot.categories) {
+            val safeId = sanitizeId(cat.id, "cat")
+            categoryIdMap[cat.id] = safeId
+            if (safeId in existingCategoryIds) continue
+            val safeName = cat.name.trim().ifBlank { "Categoria" }.take(60)
+            val safeType = if (cat.type == "income") "income" else "expense"
+            phase1Writes += userRef.collection("categories").document(safeId) to mapOf(
+                "userId" to uid,
+                "name" to safeName,
+                "type" to safeType,
+                "icon" to cat.icon.trim().ifBlank { "Tag" }.take(40),
+                "color" to sanitizeHexColor(cat.color),
+                "createdAt" to now,
+                "updatedAt" to now
+            )
+            existingCategoryIds += safeId
+        }
+
+        for (goal in snapshot.goals) {
+            val safeId = sanitizeId(goal.id, "goal")
+            if (safeId in existingGoalIds) continue
+            if (goal.targetAmount <= 0.0) continue
+            val safeName = goal.name.trim().ifBlank { "Meta" }.take(80)
+            val safeStatus = if (goal.status in listOf("active", "completed", "cancelled")) {
+                goal.status
+            } else "active"
+            phase1Writes += userRef.collection("goals").document(safeId) to mapOf(
+                "userId" to uid,
+                "name" to safeName,
+                "targetAmount" to ((goal.targetAmount * 100.0).roundToLong() / 100.0),
+                "currentAmount" to ((goal.currentAmount.coerceAtLeast(0.0) * 100.0).roundToLong() / 100.0),
+                "deadline" to sanitizeIsoDate(goal.deadline),
+                "color" to sanitizeHexColor(goal.color),
+                "status" to safeStatus,
+                "createdAt" to now,
+                "updatedAt" to now
+            )
+        }
+
+        commitWriteChunks(phase1Writes)
+
+        // Phase 2: Transactions and Budgets (referencing accounts/categories now guaranteed in Firestore)
+        val phase2Writes = mutableListOf<Pair<DocumentReference, Map<String, Any>>>()
+
+        for (tx in snapshot.transactions) {
+            val safeId = sanitizeId(tx.id, "tx")
+            if (safeId in existingTxIds) continue
+            if (tx.amount <= 0.0) continue
+            val resolvedAccountId = accountIdMap[tx.accountId] ?: tx.accountId
+            if (resolvedAccountId !in existingAccountIds) continue
+
+            val safeType = if (tx.type in listOf("income", "expense", "transfer")) tx.type else "expense"
+            val resolvedToAcc = if (safeType == "transfer") {
+                accountIdMap[tx.toAccountId] ?: tx.toAccountId
+            } else ""
+            if (safeType == "transfer" && (resolvedToAcc !in existingAccountIds || resolvedToAcc == resolvedAccountId)) {
+                continue
+            }
+
+            val resolvedCatId = if (safeType == "transfer") {
+                "transfer"
+            } else {
+                val mapped = categoryIdMap[tx.categoryId] ?: tx.categoryId
+                if (mapped.isNotBlank()) sanitizeId(mapped, "cat") else "cat_alimentacao"
+            }
+
+            val safeRecurrence = if (tx.recurrenceFrequency in listOf("none", "monthly", "weekly", "yearly")) {
+                tx.recurrenceFrequency
+            } else "none"
+
+            phase2Writes += userRef.collection("transactions").document(safeId) to mapOf(
+                "userId" to uid,
+                "type" to safeType,
+                "amount" to ((tx.amount * 100.0).roundToLong() / 100.0),
+                "description" to tx.description.trim().ifBlank { "Lançamento" }.take(140),
+                "categoryId" to resolvedCatId,
+                "accountId" to resolvedAccountId,
+                "toAccountId" to resolvedToAcc,
+                "date" to sanitizeIsoDate(tx.date),
+                "status" to if (tx.status == "pending") "pending" else "paid",
+                "isRecurring" to tx.isRecurring,
+                "recurrenceFrequency" to safeRecurrence,
+                "installmentGroupId" to tx.installmentGroupId.take(128),
+                "installmentNumber" to tx.installmentNumber.coerceIn(0, 360),
+                "installmentTotal" to tx.installmentTotal.coerceIn(0, 360),
+                "notes" to tx.notes.trim().take(500),
+                "createdAt" to now,
+                "updatedAt" to now
+            )
+        }
+
+        for (budget in snapshot.budgets) {
+            val safeId = sanitizeId(budget.id, "bud")
+            if (safeId in existingBudgetIds) continue
+            if (budget.amount <= 0.0) continue
+            val resolvedCatId = categoryIdMap[budget.categoryId] ?: budget.categoryId
+            if (resolvedCatId !in existingCategoryIds) continue
+            phase2Writes += userRef.collection("budgets").document(safeId) to mapOf(
+                "userId" to uid,
+                "categoryId" to resolvedCatId,
+                "month" to sanitizeMonth(budget.month),
+                "amount" to ((budget.amount * 100.0).roundToLong() / 100.0),
+                "createdAt" to now,
+                "updatedAt" to now
+            )
+        }
+
+        commitWriteChunks(phase2Writes)
+
+        return phase1Writes.size + phase2Writes.size
     }
 
     fun observeCurrency(uid: String): Flow<String> = callbackFlow {

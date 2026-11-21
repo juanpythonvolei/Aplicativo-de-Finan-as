@@ -12,8 +12,8 @@ android {
         applicationId = "com.verticefinance.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.1.0"
+        versionCode = 4
+        versionName = "2.3.0"
     }
 
     buildTypes {
@@ -60,4 +60,6 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
 }

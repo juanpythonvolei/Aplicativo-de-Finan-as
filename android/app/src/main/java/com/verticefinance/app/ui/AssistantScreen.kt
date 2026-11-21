@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import com.verticefinance.app.data.AIConversationDoc
 import com.verticefinance.app.data.ApiUsageSummary
 import com.verticefinance.app.data.Formatters
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 private val ANDROID_QUICK_PROMPTS = listOf(
@@ -44,7 +46,8 @@ fun AssistantScreen(
     onNewConversation: () -> Unit,
     onSelectConversation: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
-    onOpenDashboard: () -> Unit
+    onOpenDashboard: () -> Unit,
+    onConnectGoogle: () -> Unit
 ) {
     var input by remember { mutableStateOf("") }
     var showHistorySheet by remember { mutableStateOf(false) }
@@ -204,6 +207,18 @@ fun AssistantScreen(
                                 lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (state.isLocalMode) {
+                                Spacer(Modifier.height(12.dp))
+                                Button(
+                                    onClick = onConnectGoogle,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Conectar Google para IA e Nuvem")
+                                }
+                            }
                         }
                     }
                 }
@@ -454,28 +469,42 @@ fun SettingsDialog(
     currency: String,
     theme: String,
     userEmail: String,
+    isLocalMode: Boolean,
+    biometricAvailable: Boolean,
+    biometricEnabled: Boolean,
+    syncing: Boolean,
+    lastSyncedAtMillis: Long,
+    hasPendingLocalSync: Boolean,
+    localSummary: String,
     apiUsage: ApiUsageSummary?,
     apiUsageLoading: Boolean,
     onRefreshApiUsage: () -> Unit,
+    onSyncNow: () -> Unit,
+    onConnectGoogle: () -> Unit,
+    onToggleBiometric: (Boolean) -> Unit,
+    onLockNow: () -> Unit,
     onSelectCurrency: (String) -> Unit,
     onSelectTheme: (String) -> Unit,
     onSignOut: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val lastSyncFormatted = remember(lastSyncedAtMillis) {
+        if (lastSyncedAtMillis <= 0L) "Ainda não sincronizado"
+        else SimpleDateFormat("dd/MM HH:mm", Locale("pt", "BR")).format(Date(lastSyncedAtMillis))
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text("Configurações e Conta", fontWeight = FontWeight.Bold)
-                if (userEmail.isNotBlank()) {
-                    Text(
-                        text = userEmail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text("Configurações e Sincronização", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (isLocalMode) "Modo Local (Offline)" else userEmail.ifBlank { "Conta conectada" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         },
         text = {
@@ -485,6 +514,139 @@ fun SettingsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Local-First Storage & Google Cloud Sync Section
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isLocalMode) Icons.Outlined.PhoneAndroid else Icons.Outlined.CloudDone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Armazenamento Local & Nuvem Google",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Text(
+                            text = "Cofre local: $localSummary",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (isLocalMode) {
+                                "Status: Salvo apenas neste aparelho. Conecte sua conta Google para fazer backup e sincronizar na nuvem."
+                            } else if (hasPendingLocalSync) {
+                                "Status: Alterações locais aguardando envio · Última sync: $lastSyncFormatted"
+                            } else {
+                                "Status: Local + Nuvem sincronizados · Última sync: $lastSyncFormatted"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        if (isLocalMode) {
+                            Button(
+                                onClick = onConnectGoogle,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Conectar Google e Sincronizar")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onSyncNow,
+                                enabled = !syncing,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (syncing) "Sincronizando..." else "Sincronizar com a Nuvem agora")
+                            }
+                        }
+                    }
+                }
+
+                // Biometric Security Section (Face ID / Fingerprint integrated with Local Vault)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Biometria (Face ID / Digital)",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Switch(
+                                checked = biometricEnabled && biometricAvailable,
+                                enabled = biometricAvailable,
+                                onCheckedChange = { checked -> onToggleBiometric(checked) }
+                            )
+                        }
+                        Text(
+                            text = if (!biometricAvailable) {
+                                "Biometria ou bloqueio de tela não configurado neste aparelho."
+                            } else if (biometricEnabled) {
+                                "Ativa: o cofre local solicita sua biometria ao abrir o aplicativo."
+                            } else {
+                                "Ative para desbloquear o cofre local rapidamente com digital ou rosto."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (biometricEnabled && biometricAvailable) {
+                            OutlinedButton(
+                                onClick = onLockNow,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Bloquear cofre agora")
+                            }
+                        }
+                    }
+                }
+
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Moeda Principal",
@@ -522,85 +684,87 @@ fun SettingsDialog(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                if (!isLocalMode) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-                // Per-Model API Usage Section
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Uso de API por Modelo",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        TextButton(
-                            onClick = onRefreshApiUsage,
-                            enabled = !apiUsageLoading,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(if (apiUsageLoading) "Atualizando..." else "Atualizar")
-                        }
-                    }
-
-                    if (apiUsageLoading && apiUsage == null) {
+                    // Per-Model API Usage Section
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Text(
-                                text = "Consultando consumo real...",
+                                text = "Uso de API por Modelo",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            TextButton(
+                                onClick = onRefreshApiUsage,
+                                enabled = !apiUsageLoading,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(if (apiUsageLoading) "Atualizando..." else "Atualizar")
+                            }
+                        }
+
+                        if (apiUsageLoading && apiUsage == null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Text(
+                                    text = "Consultando consumo real...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else if (apiUsage != null) {
+                            Text(
+                                text = "${apiUsage.totalRequests} req · ${apiUsage.totalTokens} tokens · US$ ${String.format(Locale.US, "%.4f", apiUsage.estimatedCostUsd)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            apiUsage.models.forEach { m ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = m.label,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${m.requests} chamadas · ${m.totalTokens} tokens · ${m.avgLatencyMs}ms",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "Entrada ${m.inputTokens} · Saída ${m.outputTokens} · US$ ${String.format(Locale.US, "%.4f", m.estimatedCostUsd)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "Toque em Atualizar para consultar o consumo por modelo.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    } else if (apiUsage != null) {
-                        Text(
-                            text = "${apiUsage.totalRequests} req · ${apiUsage.totalTokens} tokens · US$ ${String.format(Locale.US, "%.4f", apiUsage.estimatedCostUsd)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        apiUsage.models.forEach { m ->
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(
-                                        text = m.label,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = "${m.requests} chamadas · ${m.totalTokens} tokens · ${m.avgLatencyMs}ms",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "Entrada ${m.inputTokens} · Saída ${m.outputTokens} · US$ ${String.format(Locale.US, "%.4f", m.estimatedCostUsd)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "Toque em Atualizar para consultar o consumo por modelo.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -615,7 +779,7 @@ fun SettingsDialog(
                 onDismiss()
                 onSignOut()
             }) {
-                Text("Sair da conta", color = CrimsonNegative)
+                Text(if (isLocalMode) "Tela de Login" else "Sair da conta", color = CrimsonNegative)
             }
         }
     )

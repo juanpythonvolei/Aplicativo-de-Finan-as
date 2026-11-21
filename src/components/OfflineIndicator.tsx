@@ -24,7 +24,7 @@ export function OfflineIndicator() {
   return (
     <div className="fixed bottom-20 lg:bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white shadow-md">
       <WifiOff className="w-3.5 h-3.5 shrink-0" />
-      <span>Modo offline — exibindo dados em cache local.</span>
+      <span>Modo offline — alterações salvas localmente com sincronização automática na nuvem.</span>
     </div>
   );
 }
